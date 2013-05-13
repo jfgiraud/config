@@ -10,6 +10,8 @@
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
 
+(set-default-font "7x13")
+
 (setq column-number-mode t)
 (setq line-number-mode t)
 (setq inhibit-startup-message t)
