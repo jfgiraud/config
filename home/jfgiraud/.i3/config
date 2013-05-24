@@ -36,7 +36,20 @@ bindsym $mod+d exec dmenu_run
 # installed.
 # bindsym $mod+d exec --no-startup-id i3-dmenu-desktop
 bindsym XF86MonBrightnessUp exec /usr/bin/xbacklight -inc 10
+bindsym Shift+XF86MonBrightnessUp exec /usr/bin/xbacklight -set 100
 bindsym XF86MonBrightnessDown exec /usr/bin/xbacklight -dec 5
+bindsym Shift+XF86MonBrightnessDown exec /usr/bin/xbacklight -set 0
+
+bindsym XF86AudioMute exec /usr/bin/amixer -q set Master toggle
+bindsym XF86AudioLowerVolume exec /usr/bin/amixer -q set Master 2- unmute
+bindsym XF86AudioRaiseVolume exec /usr/bin/amixer -q set Master 2+ unmute
+bindsym Shift+XF86AudioLowerVolume exec /usr/bin/amixer -q set Master 0% unmute
+bindsym Shift+XF86AudioRaiseVolume exec /usr/bin/amixer -q set Master 100% unmute
+bindsym Control+XF86AudioLowerVolume exec /usr/bin/amixer -q set PCM 2- unmute
+bindsym Control+XF86AudioRaiseVolume exec /usr/bin/amixer -q set PCM 2+ unmute
+bindsym Control+Shift+XF86AudioLowerVolume exec /usr/bin/amixer -q set PCM 0% unmute
+bindsym Control+Shift+XF86AudioRaiseVolume exec /usr/bin/amixer -q set PCM 100% unmute
+ 
 
 # change focus
 bindsym $mod+j focus left
