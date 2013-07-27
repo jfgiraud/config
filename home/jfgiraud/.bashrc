@@ -4,7 +4,8 @@ shopt -s cdspell
 #export PATH=$PATH:/var/lib/gems/1.8/bin
 #export PYTHONPATH=~/Logiciels/lib-egg/simplejson-2.1.3-py2.7.egg:$PYTHONPATH
 
-export JAVA_HOME=/usr/lib/jvm/java-6-openjdk
+export JAVA_HOME=/usr/lib/jvm/jdk1.7.0_25/
+export M2_HOME=/opt/maven/
 export EDITOR=vim
 export PRIORITY=$JAVA_HOME/bin/
 
