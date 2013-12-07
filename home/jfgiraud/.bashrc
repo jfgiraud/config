@@ -12,11 +12,25 @@ export PRIORITY=$JAVA_HOME/bin/
 export PATH=$PRIORITY:/opt/ruby1.8/bin/:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:/usr/bin/vendor_perl:/usr/bin/core_perl
 
 function ..() {
+    ## .. <nombre> remonte de <nombre> repertoires
+    ## .. /<chaine> remonte jusqu'a ce qu'un repertoire contient <chaine> dans son nom
     local level=$1
-    while [ $level -gt 0 ]; do
-	cd .. || break
-	level=$(($level-1))
-    done
+    if [[ ! "$level" =~ / ]]; then
+	while [ $level -gt 0 ]; do
+	    cd .. || break
+	    level=$(($level-1))
+	done
+    else
+	level=${level:1}
+	local curdir=$(pwd)
+	IFS='/' read -ra ADDR <<< "$curdir"
+	for (( i = ${#ADDR[@]}-1; i>0; i-- )); do
+	    if [[ "${ADDR[$i]}" =~ "$level" ]]; then
+		break
+	    fi
+	    cd ..
+	done
+    fi
 }
 
 function printx() {
