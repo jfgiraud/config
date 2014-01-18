@@ -39,6 +39,7 @@ bindsym XF86MonBrightnessUp exec /usr/bin/xbacklight -inc 10
 bindsym Shift+XF86MonBrightnessUp exec /usr/bin/xbacklight -set 100
 bindsym XF86MonBrightnessDown exec /usr/bin/xbacklight -dec 5
 bindsym Shift+XF86MonBrightnessDown exec /usr/bin/xbacklight -set 0
+bindsym XF86TouchpadToggle exec "synclient TouchpadOff=$(synclient | awk '/TouchpadOff/ {print ($3+1)%2}')"
 
 bindsym XF86AudioMute exec /usr/bin/amixer -q set Master toggle
 bindsym XF86AudioLowerVolume exec /usr/bin/amixer -q set Master 2- unmute
@@ -52,6 +53,8 @@ bindsym Control+Shift+XF86AudioRaiseVolume exec /usr/bin/amixer -q set PCM 100% 
 
 bindsym Control+Mod1+End exec /usr/bin/slock
 bindsym Control+Mod1+Insert exec /home/jfgiraud/.cccv
+
+bindsym $mod+b border toggle
 
 # change focus
 bindsym $mod+j focus left
@@ -132,6 +135,7 @@ bindsym $mod+Shift+c reload
 # restart i3 inplace (preserves your layout/session, can be used to upgrade i3)
 bindsym $mod+Shift+r restart
 # exit i3 (logs you out of your X session)
+bindsym $mod+Shift+v exec "feh -F ~/.i3/vim_cheat_sheet_for_programmers_screen.png"
 bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -b 'Yes, exit i3' 'i3-msg exit'"
 
 # resize window (you can also use the mouse for that)
@@ -159,6 +163,12 @@ mode "resize" {
 }
 
 bindsym $mod+r mode "resize"
+
+exec --no-startup-id i3-msg 'workspace 9; exec firefox; workspace 1'
+exec xterm
+
+
+for_window [class="feh"] floating enable
 
 # Start i3bar to display a workspace bar (plus the system information i3status
 # finds out, if available)
