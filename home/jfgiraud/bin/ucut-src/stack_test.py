@@ -144,6 +144,7 @@ if __name__ == '__main__':
     assertStackOp(['Lorem Ipsum'], None, ['lorem ipsum'], 'title')
     assertStackOp(['muspi merol'], None, ['lorem ipsum'], 'reverse')
     assertStackOp(['lorem'], None, ['loremipsum', 1, 5], 'substr')
+    assertStackOp(['bob;dad'], None, ['{0};{1}', [ "bob", "dad" ]], 'format')
 
     assertStackOp([['lorem', 'ipsum', 'dolores', 'est']], None, ['lorem ipsum dolores est'], 'split')
     assertStackOp([['lorem', 'ipsum dolores est']], None, ['lorem ipsum dolores est'], 'split', ' ', 1)
