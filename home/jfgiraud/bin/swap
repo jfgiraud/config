@@ -1,0 +1,40 @@
+#!/bin/bash
+
+ 
+usage() {
+        STATUS="$1"
+        [ -z $STATUS ] && STATUS=1
+        cat 2>&1 <<-EOF
+NAME:
+
+        $0 - swap files
+
+SYNOPSYS:
+
+        $0 FILE1 FILE2
+
+AUTHOR
+        Written by Jean-François Giraud.
+
+COPYRIGHT
+        Copyright © 2013 Jean-François Giraud.  License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+        This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+
+EOF
+        exit $STATUS 
+}
+
+if [ $# -eq 0 -o $# -ne 2 ]; then
+    usage 1
+fi
+
+TMPFILE=$(mktemp)
+
+if [ -e "$1" -a -e "$2" ]; then
+    mv "$1" $TMPFILE
+    mv "$2" "$1"
+    mv $TMPFILE "$2"
+else
+    echo "At least one given path does not exist!"
+    exit 1 
+fi
