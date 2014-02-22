@@ -1,12 +1,11 @@
 shopt -s autocd
 shopt -s cdspell
 
-export JAVA_HOME=/usr/lib/jvm/jdk1.7.0_25/
-export M2_HOME=/opt/maven/
 export EDITOR=vim
-export PRIORITY=$JAVA_HOME/bin/
 
-export PATH=$PRIORITY:/opt/ruby1.8/bin/:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:/usr/bin/vendor_perl:/usr/bin/core_perl
+if [[ ! "$PATH" =~ (^|:)"$HOME/bin"(:|$) ]]; then
+    export PATH="$PATH:$HOME/bin"
+fi
 
 function ..() {
     ## .. <nombre> remonte de <nombre> repertoires
