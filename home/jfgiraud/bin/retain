@@ -12,7 +12,7 @@ NAME:
 SYNOPSYS:
 
         $0 not-blank [ FILE ... ]
-        retains nonempty lines
+        retains not blank lines
 
         $0 odd [ FILE ... ]
         retains odd lines
