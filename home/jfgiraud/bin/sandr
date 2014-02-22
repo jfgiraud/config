@@ -1,0 +1,165 @@
+#!/bin/bash -i
+
+usage() {
+	STATUS="$1"
+	[ -z $STATUS ] && STATUS=1
+	cat 2>&1 <<-EOF
+NAME:
+
+        $0 - perform pattern replacement in files
+
+SYNOPSYS:
+
+        ==== Display help
+
+        $0 -h ...
+        -h                        display help
+
+        ==== Replace with SED expressions
+
+        $0 [ -c | -t ] <SEARCH> <REPLACE> FILE ...
+        -t                        simulates replacement. Print results on the standard output
+        -c                        when files differ, prompt confirmation before overwrite
+        <SEARCH>                  the string or the pattern to search
+        <REPLACE>                 the string or the pattern used to replace all matches 
+
+        ==== Extract and initialize a map translation
+
+        $0 -e <SEARCH> <REPLACE> FILE ...
+        -e                        extract from files all matches of <SEARCH> (string) ignoring case.
+                                  initialize a map (key:value) on the standard output which can be 
+                                  writed in file and completed to be used later.
+        <SEARCH>                  the string to search ignoring case. All distinct matches will be
+                                  a key of the map.
+        <REPLACE>                 the string used to replace matches. it is used to help to initialize
+                                  the values of the map (case modifications can be done)
+
+        ==== Replace using a map translation file
+
+        $0 -f <MAP> FILE ...
+        -f                        replace all matches of keys in the (key:value) pairs of the map file
+                                  with the corresponding value.
+        -t                        simulates replacement. Print results on the standard output
+        -c                        when files differ, prompt confirmation before overwrite
+        
+With no FILE, or when FILE is -, read standard input.
+
+AUTHOR
+	Written by Jean-François Giraud.
+
+COPYRIGHT
+	Copyright © 2012-2014 Jean-François Giraud.  License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+	This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+
+EOF
+	exit $STATUS 
+}
+
+confirm=""
+extract="false"
+mapfile=""
+while getopts cths:r:ef: o
+do  
+    case "$o" in
+	h) usage ;;
+	c) confirm="-i" ;;
+	t) dryrun="true" ;;
+	e) extract="true";;
+	f) mapfile="$OPTARG";;
+	?) echo "invalid option '$o'";;
+    esac
+done
+
+if [ "$extract" == "true" ] && [ -n "$confirm" -o -n "$dryrun" ]; then
+    echo "setting confirm option (-c) or simulation option (-t) makes no sense when extracting map translation (-e)"
+    exit 1
+elif [ -n "$dryrun" -a -n "$confirm" ]; then
+    echo "setting confirm option (-c) makes no sense when simulating replacement (-t)"
+    exit 1
+elif [ "$extract" == "true" -a -n "$mapfile" ]; then
+    echo "extraction option (-e) is not compatible with replace option using translation map (-f)"
+    exit 1
+fi
+
+shift $(($OPTIND - 1))
+
+if [ "$extract" == "true" ]; then
+    if [ $# -lt 2 ]; then
+	echo "Not enough parameters."
+	echo
+	usage 1
+    fi
+    search="$1"
+    shift
+    replace="$1"
+    shift
+fi
+
+
+file="$1"
+if [ -z $file ]; then
+        file="-"
+fi
+
+
+if [ "$extract" == "true" ]; then
+    cat $* | grep -i "${search}" -o | sort -u | awk -v src="${search}" -v dst="${replace}" '{ 
+            ori=$0
+            fl=substr(ori,0,1)
+            slaf=substr(ori,2)
+            if (ori==src) 
+               print ori ":" dst;
+            else if (tolower(ori)==ori)
+               print ori ":" tolower(dst);
+            else if (toupper(ori)==ori)
+               print ori ":" toupper(dst);
+            else if (ori == toupper(fl) tolower(slaf))
+               print ori ":" toupper(substr(dst,0,1)) tolower(substr(dst,2));
+            else
+               print ori ":" ;
+             }
+    ' | sort -u
+    exit 0
+fi
+
+
+
+while [ -n "$file" ];
+do 
+    tmp=$(mktemp)
+    ori=$(mktemp)
+    if [ -z "$mapfile" ]; then
+	cat "$file" | tee $ori | sed -e "s:${search//:/\\:}:${replace//:/\\:}:g" > $tmp
+    else
+	cp "$file" $ori 
+	awk -F':' 'function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
+            function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
+            function trim(s) { return rtrim(ltrim(s)); } 
+            NR==FNR {a[$1]=trim($2);next} {for (i in a) gsub(i,a[i])} 1' "$mapfile" "$file" > $tmp
+    fi
+    if [ -n "$dryrun" ]; then 
+	if [ "$file" == "-" ]; then
+	    file="(stdin)"
+	fi
+	printf -v separator "%*s " $(( $(tput cols) - ${#file} - 5 ))
+	echo "-- $file ${separator// /-}"
+	if ! diff "$ori" "$tmp" &> /dev/null; then
+	    diff --suppress-common-lines -y -W $(tput cols) "$ori" "$tmp"
+	fi
+	echo
+    else
+	if [ "$file" != "-" ]; then
+	    if ! diff "$file" "$tmp" &> /dev/null; then
+		cp $confirm "$tmp" "$file"
+	    fi
+	else
+	    cat $tmp
+	fi
+    fi
+    rm -f "$tmp" "$ori"
+    shift
+    file="$1"
+done
+
+exit 0
+

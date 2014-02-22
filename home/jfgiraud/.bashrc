@@ -1,9 +1,6 @@
 shopt -s autocd
 shopt -s cdspell
 
-#export PATH=$PATH:/var/lib/gems/1.8/bin
-#export PYTHONPATH=~/Logiciels/lib-egg/simplejson-2.1.3-py2.7.egg:$PYTHONPATH
-
 export JAVA_HOME=/usr/lib/jvm/jdk1.7.0_25/
 export M2_HOME=/opt/maven/
 export EDITOR=vim
@@ -44,31 +41,13 @@ function unicode() {
 function swap() { 
     if [[ -e "$1" && -e "$2" ]]      # if files exist
     then
-	local TMPFILE=$(tempfile)
+	local TMPFILE=$(mktemp)
 	mv "$1" $TMPFILE
 	mv "$2" "$1"
 	mv $TMPFILE "$2"
     else
 	echo "Error: Make sure the files exist."
     fi
-}
-
-function genpass() {
-    LENGTH=${1:-10}
-    if [ "$2" == "0" ]; then
-	CHAR="[:alnum:]"
-    elif [ "$2" == "1" ]; then
-	CHAR="[:graph:]"
-    elif [ "${2:0:1}" != "+" ]; then
-	echo "Erreur: vous devez spécifier les caractères acceptés"
-	echo "Exemple: $ genpass 32 '+[:alnum:]_'"
-	echo "2na2lku4FBqM7eNPC_aooahXV0c8GxI7"
-	return
-    else
-	CHAR="${2:1}"
-    fi
-    cat /dev/urandom | tr -cd "$CHAR" | head -c $LENGTH
-    echo
 }
 
 alias run='ant webapp-run'

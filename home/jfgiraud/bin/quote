@@ -1,0 +1,154 @@
+#!/bin/bash -i
+
+
+usage() {
+	STATUS="$1"
+	[ -z $STATUS ] && STATUS=1
+	cat 2>&1 <<-EOF
+NAME:
+
+        $0 - quote and join words or lines in files
+
+SYNOPSYS:
+
+        $0 [ -w | -l | -d <string> ] [ [ -a <string> | -b <string> -c <string> ] | [ -q | -qq ] ] [ -j <string> ]
+
+        Where:
+
+        Item selector:
+             -w   word
+             -l   line
+
+        Quote:
+             -q  '         (left+right)
+             -qq "         (left+right)
+             -a  <string>       (left)
+             -b  <string>       (right)
+             -c  <string>       (left+right)
+             -p  <parenthese>   (left+right) where parenthese must be <, {, ( or [
+                                right parenthese will be the closing parenthese
+
+        Join items:
+             -j  <string>  
+
+        Defaults values are:
+             -l
+             -qq
+             -j'\n'
+
+        Example:
+
+        $ echo lorem ipsum dolores est | quote -w -a'<' -b'>' -j# 
+        <lorem>#<ipsum>#<dolores>#<est>
+
+        $ echo lorem ipsum dolores est | quote -w
+        "lorem", "ipsum", "dolores", "est"
+
+        $ echo lorem ipsum dolores est | ./quote -w -p'<' -j# 
+        <lorem>#<ipsum>#<dolores>#<est>
+
+With no FILE, or when FILE is -, read standard input.
+
+AUTHOR
+	Written by Jean-François Giraud.
+
+COPYRIGHT
+	Copyright © 2013 Jean-François Giraud.  License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+	This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+
+EOF
+	exit $STATUS 
+}
+
+what='l'
+left=''
+right=''
+strip=1
+qchar=''
+join='\n'
+while getopts qlwshj:a:b:c:p: o
+do  
+	case "$o" in
+		h) usage ;;
+		l) what='l';;
+		w) what='w'
+		   strip=1
+		   ;;
+	        j) join="$OPTARG";;
+	        q) if [ -z "$qchar" ]; then
+		           qchar="'"
+		   else
+		           qchar='"'
+		   fi
+		   ;;
+		a) left="$OPTARG"
+		   ;;
+	        s) strip=0;;
+		b) right="$OPTARG"
+		   ;;
+		c) left="$OPTARG"
+		   right="$OPTARG"
+		   ;;
+                p) if [ "$OPTARG" == '<' ]; then
+		     right=">"
+		   elif [ "$OPTARG" == '(' ]; then
+		     right=")"
+		   elif [ "$OPTARG" == '{' ]; then
+		     right="}"
+		   elif [ "$OPTARG" == '[' ]; then
+		     right="]"
+		   else
+		     usage "Invalid paren!"
+                   fi
+		   left="$OPTARG"
+		   ;;
+	        ?) echo "invalid option '$o'";;
+	esac
+done
+
+if [ -n "$qchar" ]; then
+    left="$qchar"
+    right="$qchar"
+fi
+
+shift $(($OPTIND - 1))
+
+file="$1"
+if [ -z $file ]; then
+        file="-"
+fi
+
+shopt -s extglob
+
+function strip() {
+    s="$1"
+    s="${s%%+([[:space:]])}"
+    s="${s##+([[:space:]])}"
+    echo "$s"
+}
+
+function print() {
+    echo "$left$1$right"
+}
+
+while [ -n "$file" ];
+do
+	cat "$file" | while IFS=$'\n' read line || [[ $line ]]
+	do
+	    if [ "$what" == 'l' ]; then
+		if [ $strip -eq 1 ]; then
+		    line=$(strip "$line")
+		fi
+		[ -n "$line" ] && print "$line"
+	    elif [ "$what" == 'w' ]; then
+		for word in $line
+		do
+		    word=$(strip "$word")
+		    print "$word"
+		done
+	    fi
+	done | sed ":a;N;\$!ba;s/\n/$join/g"
+	shift
+	file="$1"
+done
+
