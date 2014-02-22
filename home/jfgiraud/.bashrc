@@ -38,19 +38,6 @@ function unicode() {
     for c in à â é è ê ë î ï ô ö ù û ü ÿ ç; do printf "$c \\\\u00%.2x\n" "'$c"; done
 }
 
-function swap() { 
-    if [[ -e "$1" && -e "$2" ]]      # if files exist
-    then
-	local TMPFILE=$(mktemp)
-	mv "$1" $TMPFILE
-	mv "$2" "$1"
-	mv $TMPFILE "$2"
-    else
-	echo "Error: Make sure the files exist."
-    fi
-}
-
-alias run='ant webapp-run'
 alias ll='./bin/sql-connect -ll'
 alias g='./bin/sql-connect -g'
 alias lv='./bin/sql-connect -v'
