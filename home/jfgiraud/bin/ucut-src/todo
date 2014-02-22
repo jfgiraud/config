@@ -1,0 +1,19 @@
+_____________
+
+en mode bytes, il doit pouvoir y avoir un delimiter de sortie
+
+cat ../villes_france.csv |cut -b 1,3,2 --output-delimiter='#'
+1#,#2
+
+_____________
+
+bug en mode caractere
+
+$ cat ../villes_france.csv |python3 ucut -c 1,3,2
+Traceback (most recent call last):
+  File "ucut", line 453, in <module>
+    cut_fd(sys.stdin)
+  File "ucut", line 421, in cut_fd
+    sys.stdout.write(output_delimiter.join(values)) 
+TypeError: sequence item 0: expected bytes, int found
+
