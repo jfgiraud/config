@@ -1,0 +1,540 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# [[[cog
+# import cog
+# import io
+# if include == '1':
+#     with io.open('stack.py', 'r', encoding='utf-8') as fd:
+#         for line in fd:
+#             if not line.startswith('#!/usr/bin/python'):
+#                 cog.out(line)
+# else:
+#     cog.outl('from stack import tokenize, Prog, Stack')   
+# ]]]
+from stack import tokenize, Prog, Stack
+# [[[end]]]
+
+import sys
+import textwrap
+import re
+import getopt
+import locale
+import codecs
+import os
+
+fields=None
+byts=None
+characters=None
+delimiter=None
+only_delimited=False
+output_delimiter=None
+arobasepresent=False
+whitespace=False
+
+if sys.version_info >= (3, 0, 0):
+    is_python3 = True
+else:
+    is_python3 = False
+
+#$ printf "a;abc\nb;zbc\n" | python2 ucut -d ';' -f '2,2@{"a" startswith "yes" "no" ifte},1'
+#head ~/ma.csv | python2 ucut -s -f $'1:2@{ -> code libelle { "all.add(new Obj(idBidon++, \\"{0}\\", \\"{1}\\"));" code strip libelle strip 2 ->list format } }'
+#bug ~/tools/ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}"  }' ./villes_france.csv |head
+
+
+def usage():
+    sys.stdin = codecs.getreader(locale.getpreferredencoding())(sys.stdin)
+    sys.stdout = codecs.getwriter(locale.getpreferredencoding())(sys.stdout)
+    return u'''Usage: ucut [OPTION]... [FILE]...
+
+Remove sections from each line of files and apply operations on the kept sections.
+
+DESCRIPTION:
+
+    Print selected parts of lines from each FILE to standard output.
+
+    Mandatory arguments to long options are mandatory for short options too.
+
+       -b, --bytes=LIST
+              select only these bytes
+
+       -c, --characters=LIST
+              select only these characters
+
+       -w 
+              use any whitespace string as separator with -f option
+
+       -d, --delimiter=DELIM
+              use DELIM instead of TAB for field delimiter
+              with -b and -c options, DELIM may be a single character
+              with -f option, DELIM can be a string
+
+       -f, --fields=LIST
+              select only these fields;  also print any line that contains no delimiter, unless the -s option is specified
+
+              to apply operations on the kept sections, use -s option and @{ ... } syntax
+
+       -s, --only-delimited
+              do not print lines not containing delimiters
+
+       -o, --output-delimiter=STRING
+              use STRING as the output delimiter 
+              the default is to use the input delimiter or '' if -w option is used
+
+       --help display this help and exit
+
+       --version
+              output version information and exit
+
+       Use one, and only one of -b, -c or -f.  
+       Each LIST is made up of one range, or many ranges separated by commas.  
+       The order of the LIST is used to write selected input.   
+       Instead of the command cut, a range can be used more than once and can be a negative value.
+
+       Each range is one of:
+
+       N      N'th byte, character or field, counted from 1
+
+       -N     N'th byte, character or field, counted from the end
+
+       N:     from N'th byte, character or field, to end of line
+
+       -N:    from N'th byte (counted from the end (included)), character or field, to end of line
+
+       N:M    from N'th to M'th (included) byte, character or field
+
+       -N:-M  from N'th to M'th (counted from the end (included)) byte, character or field
+
+       :M     from first to M'th (included) byte, character or field
+
+       :-M    from first to M'th (counted from the end (included)) byte, character or field
+
+       Add :<STEP> after range containing ': to set the step.
+
+       With no FILE, or when FILE is -, read standard input.
+
+
+AUTHOR
+       Written by Jean-Fran\xe7ois Giraud.
+
+COPYRIGHT
+       Copyright \xa9 2012-2013 Jean-Fran\xe7ois Giraud.  License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+       This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+
+'''
+
+def parseFields(t):
+    s=[]
+    w=''
+    l=0
+    ins={'\'': False, '"': False}
+    p=None
+    e=False
+    paren=False
+    for c in t:
+        if e:
+            if c == '\\':
+                w=w+c
+            else:
+                w=w+'\\'+c
+            e=False
+        elif c == '\\':
+            e = True
+        elif c == '"' or c == "'":
+            if p is not None and p == '{':
+                w=w+' '
+            if not ins['"'] and not ins["'"]:
+                ins[c]=True
+                w=w+c
+            elif ins[c]:
+                w=w+c
+                ins[c]=False
+            else:
+                w=w+c
+        elif l == 0 and c == '(':
+            if paren:
+                raise Exception('invalid syntax (should be (..., ...)@{ ... })')
+            else:
+                paren = True
+                w=w+c
+        elif l == 0 and c == ')':
+            if not paren:
+                raise Exception('invalid syntax (should be (..., ...)@{ ... })')
+            else:
+                paren = False
+                w=w+c
+        elif l == 0 and c in [ ',', '-', ':' ] and paren:
+            w=w+c
+        elif c == '{' and not ins['"'] and not ins["'"]:
+            l=l+1
+            w=w+c
+        elif c == '}' and not ins['"'] and not ins["'"]:
+            l=l-1
+            if p is not None and p != ' ':
+                w=w+' '
+            w=w+c
+        elif c == ',' and not ins['"'] and not ins["'"] and l == 0:
+            s.append(w)
+            w=''
+        else:
+            if p is not None and p == '{' and not ins['"'] and not ins["'"]:
+                w=w+' '
+            w=w+c
+        p=c
+    if w:
+        s.append(w)
+    (f,a)=([],[])
+    for x in s:
+        x = x.strip()
+        if '@' in x:
+            (x, op) = x.split('@',1)
+        else:
+            (x, op) = (x, None)
+        if x.startswith('(') and x.endswith(')'):
+            x = x[1:-1].split(',')
+        f.append(x)
+        if op is not None:
+            op = op.strip()
+            if not op.startswith('{') and not op.endswith('}'):
+                raise Exception('invalid syntax (should be @{ ... })')
+            p = Prog()
+            p.read_until(tokenize(op), None)
+            op = p
+        a.append(op)
+    return (f, a)
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "f:d:b:c:o:sw", ["fields=", "delimiter=", "bytes=", "characters=", "only-delimited", "output-delimiter="])
+
+    if len(opts) == 0:
+        sys.stdout.write(textwrap.dedent(usage()))
+        sys.stdout.write(b'\n')
+        sys.exit(1)
+
+    for o, a in opts:
+        if o in ("-d", "--delimiter"):
+            if whitespace:
+                raise Exception('options -d and -w are mutually exclusive!')
+            elif delimiter is not None:
+                raise Exception('the delimiter is already set!')
+            #elif len(a) != 1:
+            #    raise Exception('the delimiter must be a single character!')
+            else:
+                delimiter = a
+        elif o in ("-f", "--fields"):
+            arobasepresent = '@' in a
+            if fields is not None:
+                raise Exception('the list of fields is already set!')
+            else:
+                (fields, toapply) = parseFields(a)
+        elif o in ("-b", "--bytes"):
+            arobasepresent = '@' in a
+            if byts is not None:
+                raise Exception('the list of bytes is already set!')
+            else:
+                byts = [x.strip() for x in a.split(',')]
+        elif o in ("-c", "--characters"):
+            arobasepresent = '@' in a
+            if characters is not None:
+                raise Exception('the list of characters is already set!')
+            else:
+                characters = [x.strip() for x in a.split(',')]
+        elif o in ("-s", "--only-delimited"):
+            only_delimited=True
+        elif o in ("-o", "--output-delimiter"):
+            output_delimiter=a
+        elif o in ('-w'):
+            if delimiter is not None:
+                raise Exception('options -d and -w are mutually exclusive!')
+            whitespace = True
+        else:
+            assert False, "unhandled option '%s'" % o
+
+    exclusions = ((fields is not None)<<2) | ((byts is not None)<<1) | ((characters is not None))
+    if exclusions > 4:
+        raise Exception('only one type of list may be specified!')
+
+    if (byts is not None or characters is not None) and delimiter is not None:
+        if len(delimiter) !=1:
+            raise Exception('the delimiter must be a single character!')
+        raise Exception('an input delimiter may be specified only when operating on fields!')
+
+    if (byts is not None or characters is not None) and only_delimited:
+        raise Exception('suppressing non-delimited lines makes sense only when operating on fields!')
+
+    if not whitespace and delimiter is None:
+        delimiter = '\t'
+
+    if output_delimiter is None:
+        if fields is not None:
+            if not whitespace:
+                output_delimiter=delimiter
+            else:
+                output_delimiter=''
+        else:
+            output_delimiter=''
+
+    if arobasepresent and fields is None:
+        raise Exception('@{ ... } may be specified only when operating on fields!')
+
+    if arobasepresent:
+        if delimiter is not None and only_delimited:
+            pass
+        elif whitespace:
+            pass
+        else:
+            raise Exception('[-s -d] or [-w] options may be specified when @{ ... } is used!')
+
+
+except getopt.GetoptError as err:
+    sys.stderr.write(str(err))
+    sys.stderr.write(textwrap.dedent(usage()))
+    sys.stderr.write('\n')
+    sys.exit(1)
+except Exception as err:
+    sys.stderr.write(str(err))
+    sys.stderr.write('\n')
+    sys.exit(1)
+
+def parse_field_slice(s):
+    splitted=s.split(':')
+    ifrom = splitted[0]
+    ito = splitted[1]
+    if len(splitted) == 2:
+        istep=None
+    else:
+        istep=int(splitted[2])
+    if ifrom != '':
+        ifrom=int(ifrom)
+    else:
+        ifrom = None
+    if ito != '':
+        ito=int(ito)
+    else:
+        ito=None
+
+    if istep is None:
+        istep=1
+
+    if (ifrom is not None) and (ito is None) and (istep < 0):
+        if ifrom >= 0:
+            (ifrom, ito) = (0, ifrom)
+        else:
+            (ifrom, ito) = (0, ifrom+1)
+    elif (ito is not None) and (ifrom is not None) and ito < ifrom and ifrom > 0 and ito > 0:
+        (ifrom,ito)=(abs(ito)-1,abs(ifrom))
+        istep=-abs(istep)
+    elif (ito is not None) and (ifrom is not None) and ito < ifrom and ifrom < 0 and ito < 0:
+        (ifrom,ito)=(ito, ifrom+1)
+        if ito==0:
+            ito=None
+        istep=-abs(istep)
+    elif (ito is not None) and (ifrom is not None) and ifrom < ito and ifrom < 0 and ito < 0:
+        (ifrom,ito)=(ifrom,ito+1)
+        if ito==0:
+            ito=None
+    elif (ito is not None) and (ifrom is not None) and ifrom < ito and ifrom > 0 and ito > 0:
+        ifrom=ifrom-1
+    elif (ito is not None) and (ifrom is not None) and ifrom > ito and ifrom > 0 and ito < 0:
+        ifrom=ifrom-1
+        ito=ito+1
+        if ito==0:
+            ito=None
+    elif (ito is None) and (ifrom is not None) and ifrom > 0:
+        ifrom=ifrom-1
+    else:
+        pass
+        # if ifrom is not None and ifrom > 0:
+        #     ifrom=ifrom-1
+        # if ito is not None and ito < 0:
+        #     ito=ito+1
+        #     if ito == 0:
+        #         ito = None
+    return (ifrom, ito, istep)
+
+def slice_field(splitted, t):
+    if t[2] > 0:
+        return splitted[t[0]:t[1]:t[2]]
+    else:
+        return splitted[t[0]:t[1]][::-1][::abs(t[2])]
+
+
+def parse_fields_range(ranges):
+    keep = []
+    for i in range(0, len(ranges)):
+        field=ranges[i]
+        if isinstance(field, list):
+            result = parse_fields_range(field)
+            keep.append(result)
+        elif re.match('^-?(\d+)$', field):
+            v = int(field)
+            if v > 0:
+                v = v - 1
+            keep.append(v)
+        elif re.match('^-?(\d+)?:-?(\d+)?(:-?(\d+)?)?$', field):
+            keep.append(parse_field_slice(field))
+        else:
+            raise Exception('Syntax error for "%s"' % field)
+    return keep
+ 
+def tobytes(r):
+    if is_python3:
+        # utilisé dans le cas @{ }
+        if isinstance(r, str):
+            return r.encode('utf-8')
+        elif type(r) in [ int, float ]:
+            return str(r).encode('utf-8')
+        else:
+            return r
+    else:
+        if type(r) in [ str, unicode ]:
+            return r.encode('utf-8')
+        elif type(r) in [ int, float ]:
+            return str(r).encode('utf-8')
+        else:
+            return str(type(r))
+
+
+
+def tolitteral(r):
+    if isinstance(r, bytes):
+        r = r.decode('utf-8')
+    if re.match('^(-)?\\d+[lL]$', r):
+        r = int(r)
+    elif re.match('^(-)?\\d+$', r):
+        r = int(r)
+    elif re.match('^(-)?((\\d*\.)?\\d+?([eE][+-]?\\d+)?|nan|inf)$', r):
+        r = float(token)
+    return r
+
+def cut_fd(fd):
+    if fields is not None:
+        indexes = parse_fields_range(fields)
+        for line in fd:
+            line = line
+            line = line.strip()
+            if whitespace or delimiter in line:
+                if whitespace:
+                    decomposed = line.split()
+                else:
+                    decomposed = line.split(delimiter)
+                values = []
+                for i in range(0, len(indexes)):
+                    k = indexes[i]
+                    if isinstance(k, int):
+                        if k >= len(decomposed) or (k < -len(decomposed)):
+                            pass
+                        else:
+                            r = decomposed[k]
+                            op = toapply[i]
+                            if isinstance(op, Prog):
+                                r = tolitteral(r)
+                                i = Stack([r])
+                                op.apply(i, executeProg=True, executeFunction=True)
+                                if i.empty():
+                                    r = ''
+                                else:
+                                    r = i.pop()
+                                values.append(tobytes(r))
+                            else:
+                                values.append(r)
+                    elif isinstance(k, list):
+                        op = toapply[i]
+                        if not op:
+                            raise Exception('Syntax error. ( ... ) should be used with @{ ... }')
+                        r = []
+                        for elem in k:
+                            if isinstance(elem, int):
+                                if elem >= len(decomposed) or (elem < -len(decomposed)):
+                                    pass
+                                else:
+                                    r.append( tolitteral(decomposed[elem]) )
+                            elif isinstance(elem, tuple):
+                                r.extend( [ tolitteral(x) for x in slice_field(decomposed, elem) ])
+                            else:
+                                raise Exception('Not supported result (parse_fields_range)')
+                        if isinstance(op, Prog):
+                            i=Stack(r)
+                            op.apply(i, executeProg=True, executeFunction=True)
+                            if i.empty():
+                                r = ''
+                            else:
+                                r = i.pop()
+                            values.append(tobytes(r))
+                        else:
+                            values.append(r)
+                    elif isinstance(k, tuple):
+                        op = toapply[i]
+                        if not op:
+                            values.extend( slice_field(decomposed, k) )
+                        else:
+                            r = [ tolitteral(x) for x in slice_field(decomposed, k) ]
+                            if isinstance(op, Prog):
+                                i=Stack(r)
+                                op.apply(i, executeProg=True, executeFunction=True)
+                                if i.empty():
+                                    r = ''
+                                else:
+                                    r=i.pop()
+                                values.append(tobytes(r))
+                            else:
+                                values.append(r)
+                    else:
+                        raise Exception('Not supported result (parse_fields_range)')
+                sys.stdout.write(output_delimiter.join(values))
+                sys.stdout.write(b'\n')
+            elif not only_delimited:
+                sys.stdout.write(line)
+                sys.stdout.write(b'\n')
+    elif characters is not None:
+        indexes = parse_fields_range(characters)
+        for line in fd:
+            line=line[:-1]
+            values = []
+            for k in indexes:
+                if isinstance(k,int):
+                    if k >= len(line) or (k < -len(line)):
+                        pass
+                    else:
+                        values.append(line[k:k+1])
+                else:
+                    values.append( slice_field(line, k) )
+            sys.stdout.write(output_delimiter.join(values))
+            sys.stdout.write(b'\n')
+    elif byts is not None:
+        indexes = parse_fields_range(byts)
+        for line in fd:
+            line = bytearray(line.strip())
+            values = []
+            for k in indexes:
+                if isinstance(k,int):
+                    if k >= len(line) or (k < -len(line)):
+                        pass
+                    else:
+                        values.append(line[k])
+                else:
+                    values.extend( slice_field(line, k) )
+            sys.stdout.write(bytearray(values))
+            sys.stdout.write(b'\n')
+    else:
+        raise Exception('No list of fields, bytes or characters defined.')
+
+if len(opts) == 0:
+    usage()
+    sys.exit(2)
+
+
+sys.stdin = os.fdopen(sys.stdin.fileno(), 'rb', 0)
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'wb', 0)
+
+if delimiter is not None:
+    delimiter=delimiter.encode('utf-8')
+if output_delimiter is not None:
+    output_delimiter=output_delimiter.encode('utf-8')
+
+if len(args) == 0 or (len(args) == 1 and args[0] == '-'):
+    cut_fd(sys.stdin)
+else:
+    for f in args:
+        with open(f, 'rb') as fd:
+            cut_fd(fd)
