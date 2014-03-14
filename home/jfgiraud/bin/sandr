@@ -58,10 +58,12 @@ EOF
 confirm=""
 extract="false"
 mapfile=""
-while getopts cths:r:ef: o
+direct="false"
+while getopts cdths:r:ef: o
 do  
     case "$o" in
 	h) usage ;;
+	d) direct="true";;
 	c) confirm="-i" ;;
 	t) dryrun="true" ;;
 	e) extract="true";;
@@ -83,7 +85,7 @@ fi
 
 shift $(($OPTIND - 1))
 
-if [ "$extract" == "true" ]; then
+if [ "$extract" == "true" ] || [ "$direct" == "true" ]; then
     if [ $# -lt 2 ]; then
 	echo "Not enough parameters."
 	echo
