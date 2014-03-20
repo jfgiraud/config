@@ -2,8 +2,17 @@
 
 usage() {
 	STATUS="$1"
+	MSG="$2"
 	[ -z $STATUS ] && STATUS=1
-	cat 2>&1 <<-EOF
+	if [ "$STATUS" == "0" ]; then
+	    FD=1
+	else
+	    FD=2
+	fi
+	if [ -n "$MSG" ]; then
+	    echo "$MSG" >&$FD
+	fi
+	cat >&$FD <<-EOF
 NAME:
 
         $0 - perform pattern replacement in files
@@ -17,9 +26,10 @@ SYNOPSYS:
 
         ==== Replace with SED expressions
 
-        $0 [ -c | -t ] <SEARCH> <REPLACE> FILE ...
+        $0 [ -d | -c | -t ] <SEARCH> <REPLACE> FILE ...
         -t                        simulates replacement. Print results on the standard output
         -c                        when files differ, prompt confirmation before overwrite
+        -d                        apply replacement in files 
         <SEARCH>                  the string or the pattern to search
         <REPLACE>                 the string or the pattern used to replace all matches 
 
@@ -55,18 +65,26 @@ EOF
 	exit $STATUS 
 }
 
+if [ $# -eq 0 ]; then
+    if [ -t 0 ]; then
+	usage 0
+    else
+	usage 1 "Missing parameters!" 
+    fi
+fi
+
 confirm=""
 extract="false"
 mapfile=""
 while getopts cths:r:ef: o
 do  
     case "$o" in
-	h) usage ;;
+	h) usage 0 ;;
 	c) confirm="-i" ;;
 	t) dryrun="true" ;;
 	e) extract="true";;
 	f) mapfile="$OPTARG";;
-	?) echo "invalid option '$o'";;
+	?) usage 1 "invalid option '$o'";;
     esac
 done
 
@@ -85,9 +103,7 @@ shift $(($OPTIND - 1))
 
 if [ "$extract" == "true" ]; then
     if [ $# -lt 2 ]; then
-	echo "Not enough parameters."
-	echo
-	usage 1
+	usage 1 "Not enough parameters."
     fi
     search="$1"
     shift

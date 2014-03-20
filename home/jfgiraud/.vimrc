@@ -32,6 +32,7 @@ set showmatch
 
 " Active le surlignage lors des recherches
 set hlsearch
+nnoremap <F3> :set hlsearch!<CR>
 
 " Afficher les résultats de la recherche au moment de la saisie
 set incsearch
@@ -68,4 +69,17 @@ filetype on
 
 " Raccourci (<? -> <?php)
 iab <? <?php
+
+nnoremap th  :tabfirst<CR>
+nnoremap tj  :tabnext<CR>
+nnoremap tk  :tabprev<CR>
+nnoremap tl  :tablast<CR>
+nnoremap tt  :tabedit<Space>
+nnoremap tn  :tabnext<Space>
+nnoremap tm  :tabm<Space>
+nnoremap td  :tabclose<CR>
+" Alternatively use
+"nnoremap th :tabnext<CR>
+"nnoremap tl :tabprev<CR>
+"nnoremap tn :tabnew<CR>
 

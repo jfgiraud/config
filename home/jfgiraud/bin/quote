@@ -3,8 +3,18 @@
 
 usage() {
 	STATUS="$1"
+	MSG="$2"
 	[ -z $STATUS ] && STATUS=1
-	cat 2>&1 <<-EOF
+	if [ "$STATUS" == "0" ]; then
+	    FD=1
+	else
+	    FD=2
+	fi
+	if [ -n "$MSG" ]; then
+	    echo "$MSG" >&$FD
+	    echo "" >&$FD
+	fi
+	cat >&$FD <<-EOF
 NAME:
 
         $0 - quote and join words or lines in files
@@ -69,7 +79,7 @@ join='\n'
 while getopts qlwshj:a:b:c:p: o
 do  
 	case "$o" in
-		h) usage ;;
+		h) usage 0 ;;
 		l) what='l';;
 		w) what='w'
 		   strip=1
@@ -98,7 +108,7 @@ do
 		   elif [ "$OPTARG" == '[' ]; then
 		     right="]"
 		   else
-		     usage "Invalid paren!"
+		     usage 1 "Invalid paren!"
                    fi
 		   left="$OPTARG"
 		   ;;
