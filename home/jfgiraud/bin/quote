@@ -2,26 +2,14 @@
 
 
 usage() {
-	STATUS="$1"
-	MSG="$2"
-	[ -z $STATUS ] && STATUS=1
-	if [ "$STATUS" == "0" ]; then
-	    FD=1
-	else
-	    FD=2
-	fi
-	if [ -n "$MSG" ]; then
-	    echo "$MSG" >&$FD
-	    echo "" >&$FD
-	fi
-	cat >&$FD <<-EOF
+	cat <<-EOF
 NAME:
 
-        $0 - quote and join words or lines in files
+        ${0##*/} - quote and join words or lines in files
 
 SYNOPSYS:
 
-        $0 [ -w | -l | -d <string> ] [ [ -a <string> | -b <string> -c <string> ] | [ -q | -qq ] ] [ -j <string> ]
+        ${0##*/} [ -w | -l | -d <string> ] [ [ -a <string> | -b <string> -c <string> ] | [ -q | -qq ] ] [ -j <string> ]
 
         Where:
 
@@ -67,8 +55,19 @@ COPYRIGHT
 	This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
 
 EOF
-	exit $STATUS 
+	exit 0
 }
+
+error() {
+    STATUS="$1"
+    MSG="$2"
+    cat >&2 <<-EOF
+${0##*/}: $MSG
+Try \`${0##*/} -h\` for more information.
+EOF
+    exit 1
+}
+
 
 what='l'
 left=''
@@ -76,10 +75,10 @@ right=''
 strip=1
 qchar=''
 join='\n'
-while getopts qlwshj:a:b:c:p: o
+while getopts ":qlwshj:a:b:c:p:" o
 do  
 	case "$o" in
-		h) usage 0 ;;
+		h) usage ;;
 		l) what='l';;
 		w) what='w'
 		   strip=1
@@ -108,11 +107,11 @@ do
 		   elif [ "$OPTARG" == '[' ]; then
 		     right="]"
 		   else
-		     usage 1 "Invalid paren!"
+		     error 1 "Invalid paren!"
                    fi
 		   left="$OPTARG"
 		   ;;
-	        ?) echo "invalid option '$o'";;
+	        ?) error 1 $"invalid option -- '$OPTARG'";;
 	esac
 done
 
