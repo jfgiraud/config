@@ -2,9 +2,7 @@
 
  
 usage() {
-        STATUS="$1"
-        [ -z $STATUS ] && STATUS=1
-        cat 2>&1 <<-EOF
+	cat <<-EOF
 NAME:
 
         $0 - retains lines of files and print on the standard output
@@ -20,6 +18,16 @@ SYNOPSYS:
         $0 even [ FILE ... ]
         retains even lines
 
+        $0 every-nth <pos> <nth> [ FILE ... ]
+        retains every <nth> lines starting at <pos>
+
+        $0 contain <word> [ FILE ... ]
+        retains lines containing <word>
+
+        $0 not-contain <word> [ FILE ... ]
+        retains lines containing <word>
+
+
 With no FILE, or when FILE is -, read standard input.
 
 AUTHOR
@@ -30,30 +38,59 @@ COPYRIGHT
         This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
 
 EOF
-        exit $STATUS 
+	exit 0
 }
 
+error() {
+    STATUS="$1"
+    MSG="$2"
+    cat >&2 <<-EOF
+${0##*/}: $MSG
+Try \`${0##*/} -h\` for more information.
+EOF
+    exit 1
+}
+
+
 if [ $# -eq 0 ]; then
-    usage 1
+    usage
 fi
 
-if [ "$1" == "not-blank" ]; then
+if [ "$1" == "!" ]; then
+    prefix="not-"
     shift
+else
+    prefix=""
+fi
+
+command="$prefix$1"
+
+shift
+
+if [ "$command" == "not-blank" ]; then
     sed -e 's/^[[:space:]]*$//;/^$/d' $*
-elif [ "$1" == "odd" ]; then
+elif [ "$command" == "odd" ]; then
     start=1
     nth=2
-    shift
     sed -n "${start}~${nth}p" $*
-elif [ "$1" == "even" ]; then
+elif [ "$command" == "even" ]; then
     start=2
     nth=2
-    shift
     sed -n "${start}~${nth}p" $*
-else 
+elif [ "$command" == "every-nth" ]; then
     start="$1"
     nth="$2"
     shift 2
     sed -n "${start}~${nth}p" $*
+elif [ "$command" == "contain" ]; then
+    word="$1"
+    shift 
+    grep "$word" $*
+elif [ "$command" == "not-contain" ]; then
+    word="$1"
+    shift 
+    grep -v "$word" $*
+else 
+    error 1 "Unknown command '$command'"
 fi
 
