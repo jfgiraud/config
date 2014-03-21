@@ -24,8 +24,8 @@ SYNOPSYS:
         $0 contain <word> [ FILE ... ]
         retains lines containing <word>
 
-        $0 not-contain <word> [ FILE ... ]
-        retains lines containing <word>
+        $0 ! contain <word> [ FILE ... ]
+        retains lines not containing <word>
 
 
 With no FILE, or when FILE is -, read standard input.
