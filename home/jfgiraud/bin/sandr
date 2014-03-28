@@ -1,32 +1,21 @@
 #!/bin/bash -i
 
 usage() {
-	STATUS="$1"
-	MSG="$2"
-	[ -z $STATUS ] && STATUS=1
-	if [ "$STATUS" == "0" ]; then
-	    FD=1
-	else
-	    FD=2
-	fi
-	if [ -n "$MSG" ]; then
-	    echo "$MSG" >&$FD
-	fi
-	cat >&$FD <<-EOF
+	cat <<-EOF
 NAME:
 
-        $0 - perform pattern replacement in files
+        ${0##*/} - perform pattern replacement in files
 
 SYNOPSYS:
 
         ==== Display help
 
-        $0 -h ...
+        ${0##*/} -h ...
         -h                        display help
 
         ==== Replace with SED expressions
 
-        $0 [ -d | -c | -t ] <SEARCH> <REPLACE> FILE ...
+        ${0##*/} [ -d | -c | -t ] <SEARCH> <REPLACE> FILE ...
         -t                        simulates replacement. Print results on the standard output
         -c                        when files differ, prompt confirmation before overwrite
         -d                        apply replacement in files 
@@ -35,7 +24,7 @@ SYNOPSYS:
 
         ==== Extract and initialize a map translation
 
-        $0 -e <SEARCH> <REPLACE> FILE ...
+        ${0##*/} -e <SEARCH> <REPLACE> FILE ...
         -e                        extract from files all matches of <SEARCH> (string) ignoring case.
                                   initialize a map (key:value) on the standard output which can be 
                                   writed in file and completed to be used later.
@@ -46,7 +35,7 @@ SYNOPSYS:
 
         ==== Replace using a map translation file
 
-        $0 -f <MAP> FILE ...
+        ${0##*/} -f <MAP> FILE ...
         -f                        replace all matches of keys in the (key:value) pairs of the map file
                                   with the corresponding value.
         -t                        simulates replacement. Print results on the standard output
@@ -62,65 +51,63 @@ COPYRIGHT
 	This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
 
 EOF
-	exit $STATUS 
+	exit 0
+}
+
+error() {
+    STATUS="$1"
+    MSG="$2"
+    cat >&2 <<-EOF
+${0##*/}: $MSG
+Try \`${0##*/} -h\` for more information.
+EOF
+    exit 1
 }
 
 if [ $# -eq 0 ]; then
     if [ -t 0 ]; then
-	usage 0
+	usage 
     else
-	usage 1 "Missing parameters!" 
+	error 1 "Missing parameters!" 
     fi
 fi
 
-confirm=""
-extract="false"
-mapfile=""
-direct="false"
-while getopts cdths:r:ef: o
-do  
+mode="no-confirm"
+change_mode() {
+    if [ $mode == "no-confirm" ]; then
+        mode="confirm"
+    elif [ $mode == "confirm" ]; then
+        mode="dry-run"
+    else
+        mode="dry-run"
+    fi
+}
+
+while getopts :hces:r:f: o
+do
     case "$o" in
-	h) usage 0 ;;
-	d) direct="true";;
-	c) confirm="-i" ;;
-	t) dryrun="true" ;;
-	e) extract="true";;
-	f) mapfile="$OPTARG";;
-	?) usage 1 "invalid option '$o'";;
+    h) usage ;;
+    c) change_mode ;;
+    e) extflag=1 ;;
+    f) mapping="$OPTARG" ;;
+    s) search="$OPTARG" ;;
+    r) replace="$OPTARG" ;;
+    ?) error 1 "invalid option '$OPTARG'" ;;        
     esac
 done
 
-if [ "$extract" == "true" ] && [ -n "$confirm" -o -n "$dryrun" ]; then
-    echo "setting confirm option (-c) or simulation option (-t) makes no sense when extracting map translation (-e)"
-    exit 1
-elif [ -n "$dryrun" -a -n "$confirm" ]; then
-    echo "setting confirm option (-c) makes no sense when simulating replacement (-t)"
-    exit 1
-elif [ "$extract" == "true" -a -n "$mapfile" ]; then
-    echo "extraction option (-e) is not compatible with replace option using translation map (-f)"
-    exit 1
+
+if [[ -n "$extflag" && -n "$mapping" ]]; then
+    error 1 "option -e and -f are mutually exclusives"
+elif [[ -n "$extflag" && "$mode" != "no-confirm" ]]; then
+    error 1 "setting option -e makes no sense with option -c or -cc"
+elif [[ -n "$extflag" ]] && [[ -z "$search" || -z "$replace" ]]; then
+    error 1 "setting option -e implies to set option -s and -r"
 fi
 
-shift $(($OPTIND - 1))
+shift $(( $OPTIND - 1 ))
 
-if [ "$extract" == "true" ] || [ "$direct" == "true" ]; then
-    if [ $# -lt 2 ]; then
-	usage 1 "Not enough parameters."
-    fi
-    search="$1"
-    shift
-    replace="$1"
-    shift
-fi
-
-
-file="$1"
-if [ -z $file ]; then
-        file="-"
-fi
-
-
-if [ "$extract" == "true" ]; then
+if [ -n "$extflag" ]; then
     cat $* | grep -i "${search}" -o | sort -u | awk -v src="${search}" -v dst="${replace}" '{ 
             ori=$0
             fl=substr(ori,0,1)
@@ -140,22 +127,29 @@ if [ "$extract" == "true" ]; then
     exit 0
 fi
 
+file="$1"
+if [ -z $file ]; then
+        file="-"
+fi
 
+if [ "$mode" == "confirm" ]; then
+    confirm=-i
+fi
 
 while [ -n "$file" ];
-do 
+do
     tmp=$(mktemp)
     ori=$(mktemp)
-    if [ -z "$mapfile" ]; then
+    if [ -z "$mapping" ]; then
 	cat "$file" | tee $ori | sed -e "s:${search//:/\\:}:${replace//:/\\:}:g" > $tmp
     else
-	cp "$file" $ori 
-	awk -F':' 'function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
+	cat "$file" > $ori 
+        awk -F':' 'function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
             function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
             function trim(s) { return rtrim(ltrim(s)); } 
-            NR==FNR {a[$1]=trim($2);next} {for (i in a) gsub(i,a[i])} 1' "$mapfile" "$file" > $tmp
+            NR==FNR {a[$1]=trim($2);next} {for (i in a) gsub(i,a[i])} 1' "$mapping" $ori > $tmp
     fi
-    if [ -n "$dryrun" ]; then 
+    if [ "$mode" == "dry-run" ]; then 
 	if [ "$file" == "-" ]; then
 	    file="(stdin)"
 	fi
@@ -180,4 +174,3 @@ do
 done
 
 exit 0
-
