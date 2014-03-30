@@ -25,7 +25,8 @@ SYNOPSYS:
              -c  <string>       (left+right)
              -p  <parenthese>   (left+right) where parenthese must be <, {, ( or [
                                 right parenthese will be the closing parenthese
-             -t   trim 
+             -t   do not trim item
+             -e   do not escape parentheses in item
 
         Sort:
              -s  sort
@@ -79,9 +80,10 @@ what='l'
 left=''
 right=''
 strip=1
+escape=1
 qchar=''
 join='\n'
-while getopts ":qlwthj:a:b:c:p:usSu" o
+while getopts ":qlwthj:a:b:c:p:usSue" o
 do  
 	case "$o" in
 		h) usage ;;
@@ -99,6 +101,7 @@ do
 		a) left="$OPTARG"
 		   ;;
 	        t) strip=0;;
+	        e) escape=0;;
 		b) right="$OPTARG"
 		   ;;
 		c) left="$OPTARG"
@@ -142,14 +145,29 @@ fi
 shopt -s extglob
 
 function strip() {
-    s="$1"
+    local s="$1"
     s="${s%%+([[:space:]])}"
     s="${s##+([[:space:]])}"
     echo "$s"
 }
 
+function echap() {
+    local s="$1"
+    s=${s//$left/\\$left}
+    s=${s//$right/\\$right}
+    echo "$s"
+}
+
+
 function print() {
-    echo "$left$1$right"
+    local w="$1"
+    if [ $strip -eq 1 ]; then
+	w=$(strip "$w")
+    fi
+    if [ $escape -eq 1 ]; then
+	w=$(echap "$w")
+    fi
+    [ -n "$w" ] && echo "$left$w$right"
 }
 
 function mysort() {
@@ -165,14 +183,10 @@ do
 	cat "$file" | while IFS=$'\n' read line || [[ $line ]]
 	do
 	    if [ "$what" == 'l' ]; then
-		if [ $strip -eq 1 ]; then
-		    line=$(strip "$line")
-		fi
-		[ -n "$line" ] && print "$line"
+		print "$line"
 	    elif [ "$what" == 'w' ]; then
 		for word in $line
 		do
-		    word=$(strip "$word")
 		    print "$word"
 		done
 	    fi
