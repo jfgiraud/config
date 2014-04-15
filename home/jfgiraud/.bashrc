@@ -8,10 +8,17 @@ if [[ ! "$PATH" =~ (^|:)"$HOME/bin"(:|$) ]]; then
 fi
 
 function ..() {
+    ## .. remonte d'un répertoire 
     ## .. <nombre> remonte de <nombre> repertoires
     ## .. /<chaine> remonte jusqu'a ce qu'un repertoire contient <chaine> dans son nom
+    ## OLDPWD est modifié pour que cd - retourne au répertoire avant l'appel à ..
     local level=$1
+    local _OLDPWD=$(pwd)
     if [[ ! "$level" =~ / ]]; then
+	if [ -z $level ]; then
+	    cd ..
+	    return
+	fi
 	while [ $level -gt 0 ]; do
 	    cd .. || break
 	    level=$(($level-1))
@@ -27,6 +34,7 @@ function ..() {
 	    cd ..
 	done
     fi
+    OLDPWD=$_OLDPWD
 }
 
 function printx() {
