@@ -4,12 +4,14 @@ tempf=$(mktemp)
 
 command="$1"
 
-$command --help | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' -e 's/, /\n/' -e 's/=.*/:/' -e 's/ .*/:/' > $tempf
+$command --help | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' -e 's/, /\n/' -e 's/\[\?=.*/:/' -e 's/ .*/:/' > $tempf
 
 longopts=$(grep -- '--' $tempf | sed -e 's/--//' | tr '\n' ',' | sed -e 's/,$//')
+shortopts=$(grep -v -- '--' $tempf)
 
 cat $tempf
 echo $longopts
+echo $shortopts
 
 rm -f $tempf
 
