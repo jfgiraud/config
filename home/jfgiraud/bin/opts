@@ -4,18 +4,47 @@ tempf=$(mktemp)
 
 command="$1"
 
-$command --help | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' -e 's/, /\n/' -e 's/\[\?=.*/:/' -e 's/ .*/:/' > $tempf
+#$command --help | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' -e 's/, /\n/' -e 's/\[\?=.*/:/' -e 's/ .*/:/' > $tempf
 
-longopts=$(grep -- '--' $tempf | sed -e 's/--//' | tr '\n' ',' | sed -e 's/,$//')
-shortopts=$(grep -v -- '--' $tempf)
+$command --help 2>&1 | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' > $tempf
 
-cat $tempf
-echo $longopts
-echo $shortopts
+
+function parse() {
+    local longopts=""
+    local shortopts=""
+    cat $tempf | while read line || [[ $line ]];
+    do
+	required=""
+	if [[ "$line" =~ \[= ]]; then
+	    required="::"
+	elif [[ "$line" =~ = ]]; then
+	    required=":"
+	fi
+	echo $line | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]\+.*//' | while read option || [[ $option ]];
+	do
+	    if [ ${option:0:2} == '--' ]; then
+		env
+		if [ -n "$longopts" ]; then
+		    echo "ici<$longopts>"
+		    longopts="${longopts},"
+		fi
+		longopts="${longopts}${option:2}${required}"
+		echo "la#$longopts"
+	    fi
+	done
+    done
+    echo LONG $longopts
+    echo SHORT $shortopts
+}
+
+parse
+
 
 rm -f $tempf
 
 exit 1
+
+
 
 usage() {
 	cat <<-EOF
