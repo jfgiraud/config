@@ -12,8 +12,13 @@ function sib() {
     ##   prompt for choic e(when two or more directories are found) 
     ##   change to directory after prompt 
     local substr=$1
-    choices=$(find .. -maxdepth 1 -type d -name "*${substr}*" | grep -vE '^..$' | sed -e 's:../::' | sort)
-    count=$(echo "$choices" | wc -l)
+    local curdir=$(pwd)
+    local choices=$(find .. -maxdepth 1 -type d -name "*${substr}*" | grep -vE '^..$' | sed -e 's:../::' | grep -vE "^${curdir##*/}$" | sort)
+    if [ -z "$choices" ]; then
+	echo "Sibling directory not found!"
+	return
+    fi
+    local count=$(echo "$choices" | wc -l)
     if [[ $count -eq 1 ]]; then
 	cd ../$choices
 	return 
