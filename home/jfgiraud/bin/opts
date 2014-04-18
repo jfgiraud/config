@@ -1,46 +1,41 @@
 #!/bin/bash
 
-tempf=$(mktemp)
-
 command="$1"
-
-#$command --help | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' -e 's/, /\n/' -e 's/\[\?=.*/:/' -e 's/ .*/:/' > $tempf
-
-$command --help 2>&1 | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' > $tempf
-
+shift
 
 function parse() {
+    local command="$1"
+    tempf=$(mktemp)
+    $command --help 2>&1 | sed -e 's/^[[:space:]]\{16,\}.*//' -e 's/^[[:space:]]*//' | grep -E '^-' | sed -e 's/[[:space:]]\{2,\}.*//' > $tempf
     local longopts=""
     local shortopts=""
-    cat $tempf | while read line || [[ $line ]];
+    while read line || [[ $line ]];
     do
 	required=""
-	if [[ "$line" =~ \[= ]]; then
-	    required="::"
-	elif [[ "$line" =~ = ]]; then
+        if grep -Fq '[=' <<< "$line"; then
+            required="::"
+	elif grep -Fq '=' <<< "$line"; then
 	    required=":"
 	fi
-	echo $line | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]\+.*//' | while read option || [[ $option ]];
+	while read option || [[ $option ]];
 	do
+            option=${option%%=*}
+            option=${option%[}
 	    if [ ${option:0:2} == '--' ]; then
-		env
 		if [ -n "$longopts" ]; then
-		    echo "ici<$longopts>"
 		    longopts="${longopts},"
 		fi
 		longopts="${longopts}${option:2}${required}"
-		echo "la#$longopts"
+            else
+		shortopts="${shortopts}${option:1}${required}"
 	    fi
-	done
-    done
-    echo LONG $longopts
-    echo SHORT $shortopts
+        done < <(echo $line | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]\+.*//')
+    done < $tempf
+    rm -f $tempf
+    echo "-o '$shortopts' -l '$longopts'"
 }
 
-parse
-
-
-rm -f $tempf
+getopt $(parse $command) -- "$@"
 
 exit 1
 
