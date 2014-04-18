@@ -7,11 +7,29 @@ if [[ ! "$PATH" =~ (^|:)"$HOME/bin"(:|$) ]]; then
     export PATH="$PATH:$HOME/bin"
 fi
 
+function sib() {
+    ## sib <substr> search sibling directories 
+    ##   prompt for choic e(when two or more directories are found) 
+    ##   change to directory after prompt 
+    local substr=$1
+    choices=$(find .. -maxdepth 1 -type d -name "*${substr}*" | grep -vE '^..$' | sed -e 's:../::' | sort)
+    count=$(echo "$choices" | wc -l)
+    if [[ $count -eq 1 ]]; then
+	cd ../$choices
+	return 
+    fi
+    select dir in $choices; do
+	if [ -n "$dir" ]; then
+	    cd ../$dir
+	fi
+	break
+    done
+}
+
 function ..() {
-    ## .. remonte d'un répertoire 
-    ## .. <nombre> remonte de <nombre> repertoires
-    ## .. /<chaine> remonte jusqu'a ce qu'un repertoire contient <chaine> dans son nom
-    ## OLDPWD est modifié pour que cd - retourne au répertoire avant l'appel à ..
+    ## .. <number> apply cd .. <number> times
+    ## .. /<string> apply cd .. until string is found in current directory name
+    ## OLDPWD is modified, so cd - returns to the directory before .. call
     local level=$1
     local _OLDPWD=$(pwd)
     if [[ ! "$level" =~ / ]]; then
@@ -45,8 +63,7 @@ function unicode() {
     for c in à â é è ê ë î ï ô ö ù û ü ÿ ç; do printf "$c \\\\u00%.2x\n" "'$c"; done
 }
 
-alias ll='./bin/sql-connect -ll'
-alias g='./bin/sql-connect -g'
-alias lv='./bin/sql-connect -v'
-alias ff='find . -type f | grep -v svn'
-alias cleandir=$'find . \( -name \'*~\' -o -name \'#*#\' \) -exec rm -v {} \;'
+if [[ -e "$HOME/.bashrc_local" ]]; then
+    source "$HOME/.bashrc_local"
+fi
+
