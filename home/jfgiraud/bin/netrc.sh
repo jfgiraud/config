@@ -1,8 +1,8 @@
 #!/bin/bash
 
 function select_choice () {
-    local account="$1"
-    awk $"BEGIN { RS=\"\n\n\" } /(^|\n)account ${account}(\n|$)/ { print }" ~/.netrc | sed -e 's/ /="/' -e 's/$/"/'
+    local account="${1//\//\\/}"
+    awk $"BEGIN { RS=\"\n\n\" } /(^|\n)account ${account}(\n|$)/ { print }" ~/.netrc | sed -e 's/^[[:space:]]*$//;/^$/d' | sed -e 's/ /="/' -e 's/$/"/'
 }
 
 function get_credentials () {
