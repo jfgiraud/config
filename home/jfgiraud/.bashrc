@@ -40,7 +40,6 @@ function svncmp () {
     local rev="$2"
     local choices=$(LC_ALL=C svn log "$file" | awk '/^r[[:digit:]]+[[:space:]]+/ { gsub("r", "", $1); print $1 }' | sort -r | tail -n +2)
     local revision=""
-    echo $choices
     if [[ "$rev" =~ ^-[0-9]+$ || "$rev" == "-" ]]; then
 	rev=${rev#-}
 	if [ -z "$rev" ]; then
