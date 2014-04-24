@@ -31,6 +31,33 @@ function sib() {
     done
 }
 
+function svncmp () {
+    if [ ! -x "$HOME/bin/cdiff" ]; then
+	echo "Please install 'cdiff' program in $HOME/bin/ directory (https://github.com/ymattw/cdiff)"
+	return 1
+    fi
+    local file="$1"
+    local rev="$2"
+    local choices=$(LC_ALL=C svn log "$file" | awk '/^r[[:digit:]]+[[:space:]]+/ { gsub("r", "", $1); print $1 }' | sort -r | tail -n +2)
+    local revision=""
+    echo $choices
+    if [[ "$rev" =~ ^-[0-9]+$ || "$rev" == "-" ]]; then
+	rev=${rev#-}
+	if [ -z "$rev" ]; then
+	    rev="1"
+	fi
+	revision=$(echo $choices | cut -d " " -f $rev)
+    else
+	select choice in $choices; do
+	    revision=$choice
+	    break
+	done
+    fi
+    if [ -n "$revision" ]; then
+	$HOME/bin/cdiff -s --width=$(( $(tput cols) / 2 )) -r"$revision" "$file"
+    fi
+}
+
 function ..() {
     ## .. <number> apply cd .. <number> times
     ## .. /<string> apply cd .. until string is found in current directory name
