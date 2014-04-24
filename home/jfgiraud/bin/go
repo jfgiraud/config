@@ -2,7 +2,7 @@
 
 function select_choice () {
     local account="${1//\//\\/}"
-    awk $"BEGIN { RS=\"\n\n\" } /(^|\n)account ${account}(\n|$)/ { print }" ~/.netrc | sed -e 's/^[[:space:]]*$//;/^$/d' | sed -e 's/ /="/' -e 's/$/"/'
+    awk $"BEGIN { RS=\"\n\n\" } /(^|\n)account ${account}(\n|$)/ { print }" ~/.gorc | sed -e 's/^[[:space:]]*$//;/^$/d' | sed -e 's/ /="/' -e 's/$/"/'
 }
 
 function get_credentials () {
@@ -18,16 +18,15 @@ function get_credentials () {
 	    fi
 	done
 	if [ $matches -eq 1 ]; then
-	    choices+=(${line#account})
+	    choices+=("${line#account }")
 	fi
-    done < ~/.netrc
-
+    done < ~/.gorc
     if [ ${#choices[@]} -eq 1 ]; then
 	select_choice "${choices[0]}"
 	return
     fi
 
-    select choice in ${choices[@]};
+    select choice in "${choices[@]}";
     do
 	select_choice "$choice"
 	break

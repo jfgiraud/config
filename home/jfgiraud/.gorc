@@ -1,0 +1,13 @@
+account ftp free
+type ftp
+host ftpperso.example.com
+login username
+password password
+
+account sql rech maison
+type sqlite
+file ~/recherche-immobiliere/maison.db
+
+account sql rech terrain
+type sqlite
+file ~/recherche-immobiliere/terrain.db
