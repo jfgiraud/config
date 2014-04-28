@@ -86,6 +86,20 @@ function ..() {
     OLDPWD=$_OLDPWD
 }
 
+function swap() {
+    local f1="$1"
+    local f2="$2"
+    if [ -e "$f1" -a -e "$f2" ]; then
+        local ftmp=$(mktemp)
+        mv "$f1" $ftmp
+        mv "$f2" "$f1"
+        mv $ftmp "$f2"
+    else
+        echo "At least one given path does not exist!"
+        return 1
+    fi
+}
+
 function printx() {
     printf "\\\\u00%.2x" "'$1"
 }
