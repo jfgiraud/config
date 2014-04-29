@@ -59,14 +59,13 @@ function svncmp () {
 
 function _apply_on_str() {
     local cmd="$1"
-    echo $cmd
     shift
     if [[ $# -eq 0 || "$1" == "-" ]]; then
-	cat - | $cmd
+	cat - | eval $cmd
     else
 	while [ $# -gt 0 ]; do
 	    local text="$1"
-	    echo $text | $cmd
+	    echo $text | eval $cmd
 	    shift
 	done
     fi
@@ -89,7 +88,7 @@ function unspace() {
 }
 
 function unspace1() {
-    _apply_on_str "tr -s ' \t\n' '   '" "${@}"
+    _apply_on_str "tr -s '[[:space:]]' ' '" "${@}"
 }
 
 function ..() {
