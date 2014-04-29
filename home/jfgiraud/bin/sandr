@@ -8,38 +8,26 @@ NAME:
 
 SYNOPSYS:
 
-        ==== Display help
+        ${0##*/}
+             -h | -v 
+             -s <STRING|PATTERN> -r <STRING|PATTERN> 
+             
 
-        ${0##*/} -h ...
-        -h                        display help
-
-        ==== Replace with SED expressions
-
-        ${0##*/} [ -d | -c | -t ] <SEARCH> <REPLACE> FILE ...
-        -t                        simulates replacement. Print results on the standard output
-        -c                        when files differ, prompt confirmation before overwrite
-        -d                        apply replacement in files 
-        <SEARCH>                  the string or the pattern to search
-        <REPLACE>                 the string or the pattern used to replace all matches 
-
-        ==== Extract and initialize a map translation
-
-        ${0##*/} -e <SEARCH> <REPLACE> FILE ...
-        -e                        extract from files all matches of <SEARCH> (string) ignoring case.
-                                  initialize a map (key:value) on the standard output which can be 
-                                  writed in file and completed to be used later.
-        <SEARCH>                  the string to search ignoring case. All distinct matches will be
-                                  a key of the map.
-        <REPLACE>                 the string used to replace matches. it is used to help to initialize
-                                  the values of the map (case modifications can be done)
-
-        ==== Replace using a map translation file
-
-        ${0##*/} -f <MAP> FILE ...
-        -f                        replace all matches of keys in the (key:value) pairs of the map file
-                                  with the corresponding value.
-        -t                        simulates replacement. Print results on the standard output
-        -c                        when files differ, prompt confirmation before overwrite
+        ${0##*/}
+             -h, --help           display help
+             -v, --version        display version
+             -s, --search         the string to search
+             -S, --search-regex   the pattern to search
+             -r, --replace        the string (or the pattern) used to replace all matches 
+             -e, --extract-map    extract from file or standart input all matches of searched
+                                  string or pattern.
+                                  a map created with found matches is displayed on standart 
+                                  output. entries of this map will be setted with a default
+                                  value
+             -a, --apply-map      
+             -t, --simulate
+             -c, --confirm
+                                  
         
 With no FILE, or when FILE is -, read standard input.
 
@@ -64,6 +52,66 @@ EOF
     exit 1
 }
 
+
+PARAMS=$(getopt -o "s:S:r:tcea:vh" -l "search:,search-regex:,replace:,simulate,confirm,extract-map,apply-map:,version,help" -- "$@")
+
+eval set -- "$PARAMS"
+
+mode="no-confirm"
+
+while [ "X$1" != "X--" ]; do
+    case "$1" in
+	-s|--search)
+	    shift
+	    search="$1"
+	    ;;
+	-S|--search-regex)
+	    shift
+	    search="$1"
+	    sflag=1
+	    ;;
+	-r|--replace)
+	    shift 
+	    replace="$1"
+	    ;;
+	-t|--simulate)
+	    if [ -v eflag ]; then
+		error 1 "setting option --simulate makes no sense with option --extract-map"
+	    fi
+	    mode="dry-run"
+	    ;;
+	-c|--confirm)
+	    if [ -v eflag ]; then
+		error 1 "setting option --confirm makes no sense with option --extract-map"
+	    fi
+	    mode="confirm"
+	    ;;
+	-e|--extract-map)
+	    if [ -n "$mapping" ]; then
+		error 1 "--extract-map and --apply-map option are mutually exclusives"
+	    fi
+	    eflag=1
+	    ;;
+	-a|--apply-map)
+	    if [ -v eflag ]; then
+		error 1 "--extract-map and --apply-map option are mutually exclusives"
+	    fi
+	    shift
+	    mapping="$1"
+	    ;;
+	-v|--version)
+	    echo "${0##*/} version 1.20"
+	    exit 0
+	    ;;
+	-h|--help)
+	    usage
+	    ;;
+    esac
+    shift
+done
+
+shift
+
 if [ $# -eq 0 ]; then
     if [ -t 0 ]; then
 	usage 
@@ -72,64 +120,52 @@ if [ $# -eq 0 ]; then
     fi
 fi
 
-mode="no-confirm"
-change_mode() {
-    if [ $mode == "no-confirm" ]; then
-        mode="confirm"
-    elif [ $mode == "confirm" ]; then
-        mode="dry-run"
-    else
-        mode="dry-run"
-    fi
-}
-
-while getopts :hces:r:f: o
-do
-    case "$o" in
-    h) usage ;;
-    c) change_mode ;;
-    e) extflag=1 ;;
-    f) mapping="$OPTARG" ;;
-    s) search="$OPTARG" ;;
-    r) replace="$OPTARG" ;;
-    ?) error 1 "invalid option '$OPTARG'" ;;        
-    esac
-done
-
-
-if [[ -n "$extflag" && -n "$mapping" ]]; then
-    error 1 "option -e and -f are mutually exclusives"
-elif [[ -n "$extflag" && "$mode" != "no-confirm" ]]; then
-    error 1 "setting option -e makes no sense with option -c or -cc"
-elif [[ -n "$extflag" ]] && [[ -z "$search" || -z "$replace" ]]; then
-    error 1 "setting option -e implies to set option -s and -r"
+if [ -v eflag -a -z "$search" ]; then
+    error 1 "setting option --extract-map implies to set options --search and --replace"
 fi
 
-shift $(( $OPTIND - 1 ))
+if [ -n "$eflag" ]; then
+    if [ -v sflag ]; then
+	grepopt="E"
+    fi
+    cat $* | grep -${grepopt}i "${search}" -o | sort -u | while read match || [[ $match ]]; do
+	if [ "${match}" == "${search}" ]; then
+	    echo "$match:${replace}"
+	elif [ "${match}" == "${search,,}" ]; then
+	    echo "$match:${replace,,}"
+	elif [ "${match}" == "${search^^}" ]; then
+	    echo "$match:${replace^^}"
+	elif [ "${match}" == "${search,}" ]; then
+	    echo "$match:${replace,}"
+	elif [ "${match}" == "${search^}" ]; then
+	    echo "$match:${replace^}"
+	else
+	    echo "$match:"
+	fi
+    done
 
-if [ -n "$extflag" ]; then
-    cat $* | grep -i "${search}" -o | sort -u | awk -v src="${search}" -v dst="${replace}" '{ 
-            ori=$0
-            fl=substr(ori,0,1)
-            slaf=substr(ori,2)
-            if (ori==src) 
-               print ori ":" dst;
-            else if (tolower(ori)==ori)
-               print ori ":" tolower(dst);
-            else if (toupper(ori)==ori)
-               print ori ":" toupper(dst);
-            else if (ori == toupper(fl) tolower(slaf))
-               print ori ":" toupper(substr(dst,0,1)) tolower(substr(dst,2));
-            else
-               print ori ":" ;
-             }
-    ' | sort -u
+    # | awk -v src="${search}" -v dst="${replace}" '{ 
+    #         ori=$0
+    #         fl=substr(ori,0,1)
+    #         slaf=substr(ori,2)
+    #         if (ori==src) 
+    #            print ori ":" dst;
+    #         else if (tolower(ori)==ori)
+    #            print ori ":" tolower(dst);
+    #         else if (toupper(ori)==ori)
+    #            print ori ":" toupper(dst);
+    #         else if (ori == toupper(fl) tolower(slaf))
+    #            print ori ":" toupper(substr(dst,0,1)) tolower(substr(dst,2));
+    #         else
+    #            print ori ":" ;
+    #          }
+    # ' | sort -u
     exit 0
 fi
 
 file="$1"
 if [ -z $file ]; then
-        file="-"
+    file="-"
 fi
 
 if [ "$mode" == "confirm" ]; then
@@ -141,7 +177,11 @@ do
     tmp=$(mktemp)
     ori=$(mktemp)
     if [ -z "$mapping" ]; then
-	cat "$file" | tee $ori | sed -e "s:${search//:/\\:}:${replace//:/\\:}:g" > $tmp
+	if [ -v sflag ]; then
+	    cat "$file" | tee $ori | sed -e "s#${search//#/\\#}#${replace//#/\\#}#g" > $tmp
+	else
+	    cat "$file" | tee $ori | perl -pe "s:\\Q${search//:/\\:}:${replace//:/\\:}:g" > $tmp
+	fi
     else
 	cat "$file" > $ori 
         awk -F':' 'function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
@@ -150,15 +190,15 @@ do
             NR==FNR {a[$1]=trim($2);next} {for (i in a) gsub(i,a[i])} 1' "$mapping" $ori > $tmp
     fi
     if [ "$mode" == "dry-run" ]; then 
-	if [ "$file" == "-" ]; then
-	    file="(stdin)"
-	fi
-	printf -v separator "%*s " $(( $(tput cols) - ${#file} - 5 ))
-	echo "-- $file ${separator// /-}"
 	if ! diff "$ori" "$tmp" &> /dev/null; then
+	    if [ "$file" == "-" ]; then
+		file="(stdin)"
+	    fi
+	    printf -v separator "%*s " $(( $(tput cols) - ${#file} - 5 ))
+	    echo "-- $file ${separator// /-}"
 	    diff --suppress-common-lines -y -W $(tput cols) "$ori" "$tmp"
+	    echo
 	fi
-	echo
     else
 	if [ "$file" != "-" ]; then
 	    if ! diff "$file" "$tmp" &> /dev/null; then
