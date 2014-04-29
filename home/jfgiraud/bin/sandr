@@ -129,16 +129,26 @@ if [ -n "$eflag" ]; then
 	grepopt="E"
     fi
     cat $* | grep -${grepopt}i "${search}" -o | sort -u | while read match || [[ $match ]]; do
+	c=${match:0:1}
+	s=${match:1}
+	sc=${search:0:1}
+	ss=${search:1}
+	rc=${replace:0:1}
+	rs=${replace:1}
 	if [ "${match}" == "${search}" ]; then
-	    echo "$match:${replace}"
+	    echo "$match:${replace}"	
 	elif [ "${match}" == "${search,,}" ]; then
 	    echo "$match:${replace,,}"
 	elif [ "${match}" == "${search^^}" ]; then
 	    echo "$match:${replace^^}"
+	elif [ "${match}" == "${search~~}" ]; then
+	    echo "$match:${replace~~}"
 	elif [ "${match}" == "${search,}" ]; then
 	    echo "$match:${replace,}"
 	elif [ "${match}" == "${search^}" ]; then
 	    echo "$match:${replace^}"
+	elif [ "${c^}${s,,}" == "${sc^}${ss,,}" ]; then
+	    echo "$match:${rc^}${rs,,}"
 	else
 	    echo "$match:"
 	fi
