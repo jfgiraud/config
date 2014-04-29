@@ -86,6 +86,16 @@ function ..() {
     OLDPWD=$_OLDPWD
 }
 
+function mktouch() {
+    local path="$1"
+    dn=${path%/*}
+    fn=${path%/*}
+    if [ ! -d "$dn" ]; then
+	mkdir -p "$dn"
+    fi
+    touch "$path"
+}
+
 function printx() {
     printf "\\\\u00%.2x" "'$1"
 }
