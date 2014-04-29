@@ -1,8 +1,23 @@
 #!/bin/bash
 
-function select_choice () {
+__file="$1"
+shift
+
+function get_choice_param() {
     local account="${1//\//\\/}"
-    awk $"BEGIN { RS=\"\n\n\" } /(^|\n)account ${account}(\n|$)/ { print }" ~/.gorc | sed -e 's/^[[:space:]]*$//;/^$/d' | sed -e 's/ /="/' -e 's/$/"/'
+    awk $"BEGIN { RS=\"\n\n\" } /(^|\n)account ${account}(\n|$)/ { print }" $__file | sed -e 's/^[[:space:]]*$//;/^$/d' | sed -e 's/ /="/' -e 's/$/"/'
+}
+
+function select_choice () {
+    local account="$1"
+    eval $(get_choice_param "$account")
+    if [ "$type" == "mysql" ]; then
+	mysql -P"$port" -h "$host" -u "$login" -p"$password" "$name"
+    elif [ "$type" == "ssh" ]; then
+	ssh -X "$login@$host"
+    else
+	echo "Type '$type' not supported!"
+    fi
 }
 
 function get_credentials () {
@@ -20,7 +35,8 @@ function get_credentials () {
 	if [ $matches -eq 1 ]; then
 	    choices+=("${line#account }")
 	fi
-    done < ~/.gorc
+    done < <( grep -E '^account ' $__file | sort)
+
     if [ ${#choices[@]} -eq 1 ]; then
 	select_choice "${choices[0]}"
 	return

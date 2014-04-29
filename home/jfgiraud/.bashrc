@@ -57,6 +57,41 @@ function svncmp () {
     fi
 }
 
+function _apply_on_str() {
+    local cmd="$1"
+    echo $cmd
+    shift
+    if [[ $# -eq 0 || "$1" == "-" ]]; then
+	cat - | $cmd
+    else
+	while [ $# -gt 0 ]; do
+	    local text="$1"
+	    echo $text | $cmd
+	    shift
+	done
+    fi
+}
+
+function unaccent() {
+    _apply_on_str "iconv -f utf8 -t ascii//TRANSLIT//IGNORE" "${@}"
+}
+
+function unpunct() {
+    _apply_on_str "tr -d '[[:punct:]]'" "${@}"
+}
+
+function uncntrl() {
+    _apply_on_str "tr -d '[[:cntrl:]]'" "${@}"
+}
+
+function unspace() {
+    _apply_on_str "tr -d '[[:space:]]'" "${@}"
+}
+
+function unspace1() {
+    _apply_on_str "tr -s ' \t\n' '   '" "${@}"
+}
+
 function ..() {
     ## .. <number> apply cd .. <number> times
     ## .. /<string> apply cd .. until string is found in current directory name
