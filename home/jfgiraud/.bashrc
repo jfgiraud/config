@@ -61,7 +61,31 @@ function sibp() {
     else
 	cd ../$dir
     fi
- }
+}
+
+function chd() {
+    ## chd <substr> search children directories 
+    ##   prompt for choice (when two or more directories are found) 
+    ##   change to directory after prompt 
+    local substr=$1
+    local curdir=$(pwd)
+    local choices=$(find . -maxdepth 1 -type d -name "*${substr}*" | grep -vE '^.$' | sed -e 's:./::' | sort)
+    if [ -z "$choices" ]; then
+	echo "No child directory not found!"
+	return
+    fi
+    local count=$(echo "$choices" | wc -l)
+    if [[ $count -eq 1 ]]; then
+	cd ./$choices
+	return 
+    fi
+    select dir in $choices; do
+	if [ -n "$dir" ]; then
+	    cd ./$dir
+	fi
+	break
+    done
+}
 
 function svncmp () {
     if [ ! -x "$HOME/bin/cdiff" ]; then
