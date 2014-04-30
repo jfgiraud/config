@@ -9,7 +9,7 @@ fi
 
 function sib() {
     ## sib <substr> search sibling directories 
-    ##   prompt for choic e(when two or more directories are found) 
+    ##   prompt for choice (when two or more directories are found) 
     ##   change to directory after prompt 
     local substr=$1
     local curdir=$(pwd)
@@ -30,6 +30,38 @@ function sib() {
 	break
     done
 }
+
+function sibf() {
+    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | head -n 1)
+    cd ../$dir
+}
+
+function sibl() {
+    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | tail -n 1)
+    cd ../$dir
+}
+
+function sibn() {
+    local curdir=$(pwd)
+    curdir=${curdir##*/}
+    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | grep -E -A 1 "^${curdir}$" | tail -n 1)
+    if [ "$curdir" == "$dir" ]; then
+	echo "No next sibling directory!"
+    else
+	cd ../$dir
+    fi
+}
+
+function sibp() {
+    local curdir=$(pwd)
+    curdir=${curdir##*/}
+    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | grep -E -B 1 "^${curdir}$" | head -n 1)
+    if [ "$curdir" == "$dir" ]; then
+	echo "No previous sibling directory!"
+    else
+	cd ../$dir
+    fi
+ }
 
 function svncmp () {
     if [ ! -x "$HOME/bin/cdiff" ]; then
