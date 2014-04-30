@@ -10,58 +10,71 @@ fi
 function sib() {
     ## sib <substr> search sibling directories 
     ##   prompt for choice (when two or more directories are found) 
-    ##   change to directory after prompt 
+    ##   change to directory after prompt
+    ## sib -- [ first | last | previous | next ]
     local substr=$1
+    if [ "X$substr" == "X--" ]; then
+	shift
+	substr=$1
+	if [ "$substr" == "first" ]; then
+	    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | sort | head -n 1)
+	    cd ../$dir
+	    return 0
+	elif [ "$substr" == "last" ]; then
+	    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | sort | tail -n 1)
+	    cd ../$dir
+	    return 0
+	elif [ "$substr" == "next" ]; then
+	    local curdir=$(pwd)
+	    curdir=${curdir##*/}
+	    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | sort | grep -E -A 1 "^${curdir}$" | tail -n 1)
+	    if [ "$curdir" == "$dir" ]; then
+		echo "No next sibling directory!"
+		return 1
+	    else
+		cd ../$dir
+		return 0
+	    fi
+	elif [ "$substr" == "previous" ]; then
+	    local curdir=$(pwd)
+	    curdir=${curdir##*/}
+	    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | sort | grep -E -B 1 "^${curdir}$" | head -n 1)
+	    if [ "$curdir" == "$dir" ]; then
+		echo "No previous sibling directory!"
+		return 1
+	    else
+		cd ../$dir
+		return 0
+	    fi
+	else
+	    echo "Not understood!"
+	    return 1
+	fi
+    fi
     local curdir=$(pwd)
     local choices=$(find .. -maxdepth 1 -type d -name "*${substr}*" | grep -vE '^..$' | sed -e 's:../::' | grep -vE "^${curdir##*/}$" | sort)
     if [ -z "$choices" ]; then
 	echo "Sibling directory not found!"
-	return
+	return 1
     fi
     local count=$(echo "$choices" | wc -l)
     if [[ $count -eq 1 ]]; then
 	cd ../$choices
-	return 
+	return 0
     fi
     select dir in $choices; do
 	if [ -n "$dir" ]; then
 	    cd ../$dir
+	    return 0
 	fi
 	break
     done
 }
 
-function sibf() {
-    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | head -n 1)
-    cd ../$dir
-}
-
-function sibl() {
-    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | tail -n 1)
-    cd ../$dir
-}
-
-function sibn() {
-    local curdir=$(pwd)
-    curdir=${curdir##*/}
-    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | grep -E -A 1 "^${curdir}$" | tail -n 1)
-    if [ "$curdir" == "$dir" ]; then
-	echo "No next sibling directory!"
-    else
-	cd ../$dir
-    fi
-}
-
-function sibp() {
-    local curdir=$(pwd)
-    curdir=${curdir##*/}
-    local dir=$(find .. -maxdepth 1 -type d | grep -vE '^..$' | sed -e 's:../::' | grep -E -B 1 "^${curdir}$" | head -n 1)
-    if [ "$curdir" == "$dir" ]; then
-	echo "No previous sibling directory!"
-    else
-	cd ../$dir
-    fi
-}
+alias sibn='sib -- next'
+alias sibp='sib -- previous'
+alias sibf='sib -- first'
+alias sibl='sib -- last'
 
 function chd() {
     ## chd <substr> search children directories 
@@ -86,6 +99,7 @@ function chd() {
 	break
     done
 }
+
 
 function svncmp () {
     if [ ! -x "$HOME/bin/cdiff" ]; then
