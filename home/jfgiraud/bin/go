@@ -1,53 +1,79 @@
 #!/bin/bash
 
-__file="$1"
-shift
-
-function get_choice_param() {
-    local account="${1//\//\\/}"
-    awk $"BEGIN { RS=\"\n\n\" } /(^|\n)account ${account}(\n|$)/ { print }" $__file | sed -e 's/^[[:space:]]*$//;/^$/d' | sed -e 's/ /="/' -e 's/$/"/'
+function select_choice() {
+    local file="$1"
+    local choice="$2"
+    shift 2
+    local fname=go_${choice// /_}
+    $fname "$@"
+    return $?
 }
 
-function select_choice () {
-    local account="$1"
-    eval $(get_choice_param "$account")
-    if [ "$type" == "mysql" ]; then
-	mysql -P"$port" -h "$host" -u "$login" -p"$password" "$name"
-    elif [ "$type" == "ssh" ]; then
-	ssh -X "$login@$host"
-    else
-	echo "Type '$type' not supported!"
+function search_function() {
+    local file="$1"
+    shift
+    local patterns=()
+    while [[ $# -gt 0 && "$1" != "--" ]]; do
+        patterns+=("$1")
+        shift
+    done
+    if [ "$1" == "--" ]; then
+        shift
     fi
-}
-
-function get_credentials () {
-    local patterns="account $*"
     local choices=()
     while IFS=$'\n' read line || [[ $line ]]; 
     do
+        local words=${line#declare -f go_}
+        words=${words//_/ }
 	local matches=1
-	for pattern in $patterns; do
-	    if [[ ! "$line" =~ $pattern ]]; then
-		matches=0
-		break
-	    fi
+	for pattern in "${patterns[@]}"; do
+            if [ "${pattern:0:1}" == "+" ]; then
+                pattern=${pattern:1}
+                if [[ ! "$words" =~ (^| )$pattern( |$) ]]; then
+		    matches=0
+		    break
+	        fi
+            elif [ "${pattern:0:1}" == "-" ]; then
+                pattern=${pattern:1}
+                if [[ "$words" =~ (^| )$pattern( |$) ]]; then
+		    matches=0
+		    break
+	        fi
+            else
+                if [[ ! "$words" =~ $pattern ]]; then
+		    matches=0
+		    break
+	        fi
+            fi
 	done
 	if [ $matches -eq 1 ]; then
-	    choices+=("${line#account }")
+	    choices+=("$words")
 	fi
-    done < <( grep -E '^account ' $__file | sort)
-
+    done < <( typeset -F | grep 'declare -f go_' | sort )
     if [ ${#choices[@]} -eq 1 ]; then
-	select_choice "${choices[0]}"
-	return
+	select_choice "$file" "${choices[0]}" "$@"
+	return $?
     fi
-
     select choice in "${choices[@]}";
     do
-	select_choice "$choice"
+        if [ -n "$choice" ]; then
+	    select_choice "$file" "$choice" "$@"
+            return $?
+        fi
 	break
     done
-	
+    return 1
 }
 
-get_credentials $*
+function main() {
+    local file=~/.gorc
+    if [ "X$1" == "X-f" ]; then
+        file=$2
+        shift 2
+    fi
+    source "$(readlink -f "$file")"
+    search_function "$file" "$@"
+}
+
+main "$@"
+
