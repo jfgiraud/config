@@ -19,9 +19,10 @@ SYNOPSYS:
                                   a map created with found matches is displayed on standart 
                                   output. entries of this map will be setted with a default
                                   value
-             -a, --apply-map      
-             -t, --simulate
-             -c, --confirm
+             -a, --apply-map      use a map to perform replacement
+             -t, --simulate       perform a simulation for replacements
+                                  the results will be displayed on standart output
+             -c, --confirm        prompt before applaying replacements on files
                                   
         
 With no FILE, or when FILE is -, read standard input.
