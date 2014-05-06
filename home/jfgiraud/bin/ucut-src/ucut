@@ -37,10 +37,11 @@ if sys.version_info >= (3, 0, 0):
 else:
     is_python3 = False
 
-#$ printf "a;abc\nb;zbc\n" | python2 ucut -d ';' -f '2,2@{"a" startswith "yes" "no" ifte},1'
-#head ~/ma.csv | python2 ucut -s -f $'1:2@{ -> code libelle { "all.add(new Obj(idBidon++, \\"{0}\\", \\"{1}\\"));" code strip libelle strip 2 ->list format } }'
-#bug ~/tools/ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}"  }' ./villes_france.csv |head
-
+# bug : ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}"  }' ./villes_france.csv |head
+#       produit IOError: [Errno 32] Broken pipe
+#
+# bug : echo "élo" | ./ucut -f 1
+#       retour chariot en trop
 
 def usage():
     sys.stdin = codecs.getreader(locale.getpreferredencoding())(sys.stdin)

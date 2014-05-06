@@ -5,7 +5,7 @@ from __future__ import division
 import sys
 import re
 import sys
-
+import unicodedata
 
 if sys.version_info >= (3, 0, 0):
     unicode = str
@@ -213,7 +213,7 @@ class Reader:
                     self.s.append(int(token))
                 elif re.match('^(-)?((\\d*\.)?\\d+?([eE][+-]?\\d+)?|nan|inf)$', token):
                     self.s.append(float(token))
-                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn", "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot", "keep", "pop", "push", "remove", "swap", "value", "insert", "empty", "clear", "unpick", "get", "upper", "lower", "capitalize", "length", "startswith", "endswith", "reverse", "replace", "concat", "strip", "lstrip", "rstrip", "title", "split", "rsplit", "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=', 'eval', 'sto', 'and', 'or', 'not', 'xor', '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
+                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn", "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot", "keep", "pop", "push", "remove", "swap", "value", "insert", "empty", "clear", "unpick", "get", "upper", "lower", "capitalize", "title", "deaccent", "slugify", "length", "startswith", "endswith", "reverse", "replace", "concat", "strip", "lstrip", "rstrip", "split", "rsplit", "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=', 'eval', 'sto', 'and', 'or', 'not', 'xor', '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
                     
                     associations = {
                         '+': '_add',
@@ -811,6 +811,23 @@ class Stack:
     def title(self):
         self.__assert_string([1], 'title')
         self.push(self.pop().title())
+    def __deaccent(self, some_unicode_string):
+        return ''.join(c for c in unicodedata.normalize('NFD', some_unicode_string) if unicodedata.category(c) != 'Mn')
+    def deaccent(self):
+        self.__assert_string([1], 'deaccent')
+        self.push(self.__deaccent(self.pop()))
+    def __slugify(self, text, delim='-'):
+        """Generates an slightly worse ASCII-only slug."""
+        _punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:]+')
+        result = []
+        for word in _punct_re.split(self.__deaccent(text).lower()):
+            word = unicodedata.normalize('NFKD', word).encode('ascii', 'ignore')
+            if word:
+                result.append(word.decode('ascii'))
+        return delim.join(result)
+    def slugify(self):
+        self.__assert_string([1], 'slugify')
+        self.push(self.__slugify(self.pop()))
     def split(self, *args):
         if len(args) == 2:
             (sep, maxsplit) = args
