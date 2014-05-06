@@ -115,8 +115,6 @@ shift
 if [ $# -eq 0 ]; then
     if [ -t 0 ]; then
 	usage 
-    else
-	error 1 "Missing parameters!" 
     fi
 fi
 
@@ -153,23 +151,6 @@ if [ -n "$eflag" ]; then
 	    echo "$match:"
 	fi
     done
-
-    # | awk -v src="${search}" -v dst="${replace}" '{ 
-    #         ori=$0
-    #         fl=substr(ori,0,1)
-    #         slaf=substr(ori,2)
-    #         if (ori==src) 
-    #            print ori ":" dst;
-    #         else if (tolower(ori)==ori)
-    #            print ori ":" tolower(dst);
-    #         else if (toupper(ori)==ori)
-    #            print ori ":" toupper(dst);
-    #         else if (ori == toupper(fl) tolower(slaf))
-    #            print ori ":" toupper(substr(dst,0,1)) tolower(substr(dst,2));
-    #         else
-    #            print ori ":" ;
-    #          }
-    # ' | sort -u
     exit 0
 fi
 
