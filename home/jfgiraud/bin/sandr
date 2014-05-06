@@ -9,11 +9,6 @@ NAME:
 SYNOPSYS:
 
         ${0##*/}
-             -h | -v 
-             -s <STRING|PATTERN> -r <STRING|PATTERN> 
-             
-
-        ${0##*/}
              -h, --help           display help
              -v, --version        display version
              -s, --search         the string to search
