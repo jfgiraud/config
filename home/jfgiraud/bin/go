@@ -1,5 +1,29 @@
 #!/bin/bash
 
+displaybar() {
+    local title=$1
+    if [ -z "$title" ]; then
+	printf -v separator "%*s" $(( $(tput cols) ))
+	echo "${separator// /-}"
+    else
+	printf -v separator "%*s " $(( $(tput cols) - ${#title} - 5 ))
+	echo "-- $title ${separator// /-}"
+    fi
+}
+
+function call_mysql () {
+    local host="$1"
+    local port="$2"
+    local login="$3"
+    local password="$4"
+    local dbname="$5"
+    shift 5
+    displaybar 
+    echo $"Command: mysql -h $host -P $port -u $login -p\"$password\" $dbname"
+    displaybar 
+    mysql -h $host -P $port -u $login -p"$password" $dbname "$@"
+}
+
 function select_choice() {
     local file="$1"
     local choice="$2"
