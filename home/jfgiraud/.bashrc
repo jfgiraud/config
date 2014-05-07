@@ -101,7 +101,7 @@ function chd() {
 }
 
 
-function svncmp () {
+function svn-cmp () {
     if [ ! -x "$HOME/bin/cdiff" ]; then
 	echo "Please install 'cdiff' program in $HOME/bin/ directory (https://github.com/ymattw/cdiff)"
 	return 1
@@ -124,6 +124,23 @@ function svncmp () {
     fi
     if [ -n "$revision" ]; then
 	$HOME/bin/cdiff -s --width=$(( $(tput cols) / 2 )) -r"$revision" "$file"
+    fi
+}
+
+function svn-clean () {
+    local choices=$(LC_CTYPE=en_US.UTF-8 svn st | awk '/^?/ { print $2 }')
+    if [ -z "$choices" ]; then
+	return
+    fi
+    select choice in '(all files)' $choices; do
+	break
+    done
+    if [ -n "$choice" ]; then
+	if [ "$choice" == '(all files)' ]; then
+	    rm -f $(LC_CTYPE=en_US.UTF-8 svn st | awk '/^?/ { print $2 }')
+	else
+	    rm -f "$choice"
+	fi
     fi
 }
 
