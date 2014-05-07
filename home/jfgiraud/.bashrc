@@ -128,11 +128,14 @@ function svn-cmp () {
 }
 
 function svn-clean () {
-    local choices=$(LC_CTYPE=en_US.UTF-8 svn st | awk '/^?/ { print $2 }')
+    local choices=()
+    while IFS=$"\n" read line; do
+	choices+=("$line")
+    done < <(LC_CTYPE=en_US.UTF-8 svn st | awk '/^?/ { print $2 }')
     if [ -z "$choices" ]; then
 	return
     fi
-    select choice in '(all files)' $choices; do
+    select choice in '(all files)' "${choices[@]}"; do
 	break
     done
     if [ -n "$choice" ]; then
@@ -145,18 +148,24 @@ function svn-clean () {
 }
 
 function svn-revert () {
-    local choices=$(LC_CTYPE=en_US.UTF-8 svn st | awk '/^(M|A)/ { print $2 }')
+    local filter=${*:-M|A|D}
+    filter=${filter^^}
+    filter=${filter// /|}
+    local choices=()
+    while IFS=$"\n" read line; do
+	choices+=("$line")
+    done < <(LC_CTYPE=en_US.UTF-8 svn st | awk '/^('"$filter"')/ { print $1" "$2 }')
     if [ -z "$choices" ]; then
 	return
     fi
-    select choice in '(all files)' $choices; do
+    select choice in '(all files)' "${choices[@]}"; do
 	break
     done
     if [ -n "$choice" ]; then
 	if [ "$choice" == '(all files)' ]; then
-	    svn revert $(LC_CTYPE=en_US.UTF-8 svn st | awk '/^(M|A)/ { print $2 }')
+	    svn revert $(LC_CTYPE=en_US.UTF-8 svn st | awk '/^('"$filter"')/ { print $2 }')
 	else
-	    svn revert "$choice"
+	    svn revert "${choice:2}"
 	fi
     fi
 }
