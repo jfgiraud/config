@@ -23,12 +23,20 @@ function assertEquals() {
 
 echo "élo" | ./ucut -f 1 > result.txt
 echo "élo" > expected.txt
-assertEquals "No new line"
+assertEquals "fields - No new line"
 
 echo "élo;" | ./ucut -d';' -f 1 > result.txt
 echo "élo" > expected.txt
-assertEquals "No new line (field #1)"
+assertEquals "fields - No new line (field #1)"
 
 echo ";élo" | ./ucut -d';' -f 2 > result.txt
 echo "élo" > expected.txt
-assertEquals "No new line (field #2)"
+assertEquals "fields - No new line (field #2)"
+
+echo "azertyéqwerty" | ./ucut -d'é' -f 2 > result.txt
+echo "qwerty" > expected.txt
+assertEquals "fields - Delimiter with accent"
+
+echo "élo" | ./ucut -c 1 > result.txt
+echo "é" > expected.txt
+assertEquals "chars - No new line"
