@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 # [[[cog
@@ -22,6 +22,8 @@ import getopt
 import locale
 import codecs
 import os
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE,SIG_DFL) 
 
 fields=None
 byts=None
@@ -37,14 +39,9 @@ if sys.version_info >= (3, 0, 0):
 else:
     is_python3 = False
 
-# bug : ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}"  }' ./villes_france.csv |head
-#       produit IOError: [Errno 32] Broken pipe
-#
-# bug : echo "élo" | ./ucut -f 1
-#       retour chariot en trop
 
-def usage():
-    return '''Usage: ucut [OPTION]... [FILE]...
+def usage(status):
+    text = '''Usage: ucut [OPTION]... [FILE]...
 
 Remove sections from each line of files and apply operations on the kept sections.
 
@@ -121,6 +118,8 @@ COPYRIGHT
        This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
 
 '''
+    print(textwrap.dedent(text))
+    sys.exit(status)
 
 def parseFields(t):
     s=[]
@@ -206,9 +205,7 @@ try:
     opts, args = getopt.getopt(sys.argv[1:], "f:d:b:c:o:sw", ["fields=", "delimiter=", "bytes=", "characters=", "only-delimited", "output-delimiter="])
 
     if len(opts) == 0:
-        sys.stdout.write(textwrap.dedent(usage()))
-        sys.stdout.write('\n')
-        sys.exit(1)
+        usage(1)
 
     for o, a in opts:
         if o in ("-d", "--delimiter"):
@@ -286,14 +283,9 @@ try:
 
 
 except getopt.GetoptError as err:
-    sys.stderr.write(str(err))
-    sys.stderr.write(textwrap.dedent(usage()))
-    sys.stderr.write('\n')
-    sys.exit(1)
+    usage(1)
 except Exception as err:
-    sys.stderr.write(str(err))
-    sys.stderr.write('\n')
-    sys.exit(1)
+    usage(1)
 
 def parse_field_slice(s):
     splitted=s.split(':')
@@ -516,9 +508,7 @@ def cut_fd(fd):
         raise Exception('No list of fields, bytes or characters defined.')
 
 if len(opts) == 0:
-    usage()
-    sys.exit(2)
-
+    usage(2)
 
 if len(args) == 0 or (len(args) == 1 and args[0] == '-'):
     cut_fd(sys.stdin)
