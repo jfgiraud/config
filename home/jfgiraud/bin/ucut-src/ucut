@@ -412,8 +412,8 @@ def cut_fd(fd):
     if fields is not None:
         indexes = parse_fields_range(fields)
         for line in fd:
-            line = line
-            #line = line.strip()
+            if line.endswith(b'\n'):
+                line=line[:-1]
             if whitespace or delimiter in line or delimiter == b'\n':
                 if whitespace:
                     decomposed = line.split()
