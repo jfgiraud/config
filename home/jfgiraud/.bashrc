@@ -145,7 +145,7 @@ function svn-clean () {
 }
 
 function svn-revert () {
-    local choices=$(LC_CTYPE=en_US.UTF-8 svn st | awk '/^?/ { print $2 }')
+    local choices=$(LC_CTYPE=en_US.UTF-8 svn st | awk '/^(M|A)/ { print $2 }')
     if [ -z "$choices" ]; then
 	return
     fi
@@ -154,7 +154,7 @@ function svn-revert () {
     done
     if [ -n "$choice" ]; then
 	if [ "$choice" == '(all files)' ]; then
-	    svn revert $(LC_CTYPE=en_US.UTF-8 svn st | awk '/^?/ { print $2 }')
+	    svn revert $(LC_CTYPE=en_US.UTF-8 svn st | awk '/^(M|A)/ { print $2 }')
 	else
 	    svn revert "$choice"
 	fi
