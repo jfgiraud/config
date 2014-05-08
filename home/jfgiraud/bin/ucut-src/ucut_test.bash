@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# bug : ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}"  }' ./villes_france.csv |head
+# bug : ucut2 -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}"  }' ./villes_france.csv |head
 #       produit IOError: [Errno 32] Broken pipe
 #
-# bug : echo "élo" | ./ucut -f 1
+# bug : echo "élo" | ./ucut2 -f 1
 #       retour chariot en trop
 
 
@@ -19,6 +19,7 @@ function assertEquals() {
 	echo
         cat result.txt
 	echo
+        exit 1
     else
         echo "OK"
     fi
@@ -45,17 +46,27 @@ echo "azertyéôîqwerty" | ./ucut -d'éôî' -f 2 > result.txt
 echo "qwerty" > expected.txt
 assertEquals "fields - Delimiter with accent (multiple chars)"
 
-echo "élo" | ./ucut -c 1 | hexdump -ve '1/1 "%.2x"' > result.txt
-echo "élo" | cut -c 1 | hexdump -ve '1/1 "%.2x"' > expected.txt
+function hex() {
+    hexdump -ve '1/1 "%.2x"'
+    #cat -
+}
+
+echo "élo" | ./ucut -c 1 | hex > result.txt
+echo "élo" | cut -c 1 | hex > expected.txt
 assertEquals "chars - Accents (1)"
 
-echo "élo" | ./ucut -c '1:' | hexdump -ve '1/1 "%.2x"' > result.txt
-echo "élo" | cut -c '1-' | hexdump -ve '1/1 "%.2x"' > expected.txt
+echo "élo" | ./ucut -c 1,3 -o ô | hex > result.txt
+echo "élo" | cut -c 1,3 --output-delimiter=ô | hex > expected.txt
+assertEquals "chars - Accents (1,3) with output-delimiter set to ô"
+
+
+echo "élo" | ./ucut -c '1:' | hex > result.txt
+echo "élo" | cut -c '1-' | hex > expected.txt
 assertEquals "chars - Accents (1-)"
 
 for to in 44 45 46; do
-    echo 'Quittant le wharf de l’île de Croÿ, le cœur déçu mais l’âme en joie, son fez brûlé sur la tête, la plutôt naïve Lætitia crapaüta en canoë au delà des Kerguelen, pour s’exiler où ? Près du mälström !' | ./ucut -b 30:$to | hexdump -e '1/1 "%.2x"' > result.txt
-    echo 'Quittant le wharf de l’île de Croÿ, le cœur déçu mais l’âme en joie, son fez brûlé sur la tête, la plutôt naïve Lætitia crapaüta en canoë au delà des Kerguelen, pour s’exiler où ? Près du mälström !' | cut -b 30-$to | hexdump -e '1/1 "%.2x"' > expected.txt
+    echo 'Quittant le wharf de l’île de Croÿ, le cœur déçu mais l’âme en joie, son fez brûlé sur la tête, la plutôt naïve Lætitia crapaüta en canoë au delà des Kerguelen, pour s’exiler où ? Près du mälström !' | ./ucut -b 30:$to | hex > result.txt
+    echo 'Quittant le wharf de l’île de Croÿ, le cœur déçu mais l’âme en joie, son fez brûlé sur la tête, la plutôt naïve Lætitia crapaüta en canoë au delà des Kerguelen, pour s’exiler où ? Près du mälström !' | cut -b 30-$to | hex > expected.txt
     assertEquals "bytes - Accents (30-$to)"
 done
 
@@ -85,3 +96,5 @@ EOF
 (./ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}" swap format }' given.txt | head -n 10) &> result.txt
 
 assertEquals "pipes"
+
+

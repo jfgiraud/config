@@ -22,6 +22,8 @@ import getopt
 import locale
 import codecs
 import os
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE,SIG_DFL) 
 
 fields=None
 byts=None
@@ -36,12 +38,6 @@ if sys.version_info >= (3, 0, 0):
     is_python3 = True
 else:
     is_python3 = False
-
-# bug : ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}"  }' ./villes_france.csv |head
-#       produit IOError: [Errno 32] Broken pipe
-#
-# bug : echo "élo" | ./ucut -f 1
-#       retour chariot en trop
 
 def usage():
     sys.stdin = codecs.getreader(locale.getpreferredencoding())(sys.stdin)
