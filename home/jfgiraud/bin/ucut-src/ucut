@@ -40,9 +40,7 @@ else:
     is_python3 = False
 
 def usage():
-    sys.stdin = codecs.getreader(locale.getpreferredencoding())(sys.stdin)
-    sys.stdout = codecs.getwriter(locale.getpreferredencoding())(sys.stdout)
-    return u'''Usage: ucut [OPTION]... [FILE]...
+    return '''Usage: ucut [OPTION]... [FILE]...
 
 Remove sections from each line of files and apply operations on the kept sections.
 
@@ -205,7 +203,7 @@ try:
 
     if len(opts) == 0:
         sys.stdout.write(textwrap.dedent(usage()))
-        sys.stdout.write(b'\n')
+        sys.stdout.write('\n')
         sys.exit(1)
 
     for o, a in opts:
