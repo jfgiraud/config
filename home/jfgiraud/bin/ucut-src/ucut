@@ -199,7 +199,7 @@ def parseFields(t):
     return (f, a)
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "f:d:b:c:o:sw", ["fields=", "delimiter=", "bytes=", "characters=", "only-delimited", "output-delimiter="])
+    opts, args = getopt.getopt(sys.argv[1:], "hf:d:b:c:o:sw", ["help", "fields=", "delimiter=", "bytes=", "characters=", "only-delimited", "output-delimiter="])
 
     if len(opts) == 0:
         sys.stdout.write(textwrap.dedent(usage()))
@@ -242,6 +242,10 @@ try:
             if delimiter is not None:
                 raise Exception('options -d and -w are mutually exclusive!')
             whitespace = True
+        elif o in ("-h", "--help"):
+            sys.stdout.write(textwrap.dedent(usage()))
+            sys.stdout.write('\n')
+            sys.exit(1)
         else:
             assert False, "unhandled option '%s'" % o
 
@@ -399,7 +403,7 @@ def tolitteral(r):
     elif re.match('^(-)?\\d+$', r):
         r = int(r)
     elif re.match('^(-)?((\\d*\.)?\\d+?([eE][+-]?\\d+)?|nan|inf)$', r):
-        r = float(token)
+        r = float(r)
     return r
 
 def cut_fd(fd):
@@ -513,11 +517,6 @@ def cut_fd(fd):
             sys.stdout.write(b'\n')
     else:
         raise Exception('No list of fields, bytes or characters defined.')
-
-if len(opts) == 0:
-    usage()
-    sys.exit(2)
-
 
 sys.stdin = os.fdopen(sys.stdin.fileno(), 'rb', 0)
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'wb', 0)
