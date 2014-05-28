@@ -51,42 +51,52 @@ def read_url(urlopener, url, encoding='latin1'):
         raise Exception('Erreur lors de la récupération de %s' % url)
 
 
-def parse_url(url):
+def parse_url(namespace, depth, url):
     page = read_url(None, url)
     for line in page.split('\n'):
         if line.startswith('<IMG SRC="/icons/folder.gif" ALT="[DIR]">'):
             line = line.replace('<IMG SRC="/icons/folder.gif" ALT="[DIR]"> <A HREF="', '')
             line = line[:line.find('/')]
-            if 'http://' not in line:
-                parse_url(url + '/' + line)
-        else:
-            pattern = '<IMG SRC="/icons/([\w\.]+)" ALT="\[([\w ]+)\]">'
-            m = re.match(pattern, line)
-            if m:
-                icon = m.group(1)
-                if icon == 'back.gif':
-                    continue
-                parsed = [ x.strip() for x in line.split('>') ]
-                href = parsed[1][9:-1]
-                (date, size) = (x.strip() for x in parsed[3].rsplit(' ', 1))
-                print(date + '|' + size + '|' + url + '/' + href)
+            tourl = url + '/' + line
+            if namespace.max_depth is not None and (depth + 1 > namespace.max_depth):
+                print(':: max depth reached; ignore ' + tourl) 
+            elif 'http://' not in line:
+                parse_url(namespace, depth+1, tourl)
+            continue
+
+        pattern = '<IMG SRC="/icons/([\w\.]+)" ALT="\[([\w ]+)\]">'
+        m = re.match(pattern, line)
+        if m:
+            icon = m.group(1)
+            if icon == 'back.gif':
+                continue
+            parsed = [ x.strip() for x in line.split('>') ]
+            href = url + '/' + parsed[1][9:-1]
+            (date, size) = (x.strip() for x in parsed[3].rsplit(' ', 1))
+            if namespace.min_depth is not None and depth < namespace.min_depth:
+                print(':: min depth not reached; ignore ' + href) 
+            else:
+                print(date + '|' + size + '|' + url + '/' + href)    
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                  add_help=True,
                                  description='Create a file containing urls from an url')
-
+    
+parser.add_argument('url', metavar='URL', type=str, nargs=1, help='The url where performing operation')
+parser.add_argument('--max-depth', metavar='LEVELS', type=int, help='Descend at mots levels')
+parser.add_argument('--min-depth', metavar='LEVELS', type=int, help='Ignore file links at levels less than levels')
+parser.add_argument('--accept', metavar='EXTENSIONS', type=str, help='Accept only the specified extensions')
 #parser_extract.add_argument('--force', help="Force a default replace entry for all matches", action='store_true')
 #parser_extract.add_argument('search', metavar='SEARCH', help='The string to search (ignoring case)')
 #parser_extract.add_argument('replacement', metavar='REPLACEMENT', help='The string used to initialize values of the translation map')
-parser.add_argument('url', metavar='URL', type=str, nargs=1, help='The url where performing operation')
 
 if len(sys.argv)==1: 
     parser.print_help()
     sys.exit(1)
 
 namespace = parser.parse_args()
-
+print(namespace.max_depth)
 try:
-    parse_url(namespace.url[0])
+    parse_url(namespace, 0, namespace.url[0])
 except KeyboardInterrupt:
     print('Interrupted.')
