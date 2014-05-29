@@ -72,6 +72,11 @@ def parse_url(namespace, depth, url):
                 continue
             parsed = [ x.strip() for x in line.split('>') ]
             href = url + '/' + parsed[1][9:-1]
+            if namespace.accept is not None:
+                ok = any([href.endswith('.'+x) for x in namespace.accept.split(',')])
+                if not ok:
+                    print(':: extension not accepted; ignore ' + href) 
+                    continue
             (date, size) = (x.strip() for x in parsed[3].rsplit(' ', 1))
             if namespace.min_depth is not None and depth < namespace.min_depth:
                 print(':: min depth not reached; ignore ' + href) 
