@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3 -u
 # -*- coding: utf-8 -*-
 
 import argparse
@@ -9,6 +9,9 @@ import urllib
 import urllib.request
 import urllib.parse
 import datetime
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE,SIG_DFL) 
+
 
 # RAF 
 # fmt
