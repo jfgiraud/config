@@ -50,6 +50,13 @@ def read_url(urlopener, url, encoding='latin1'):
         #traceback.print_exc()
         raise Exception('Erreur lors de la récupération de %s' % url)
 
+def size(s):
+    if s[-1]=='k':
+        return int(float(s[:-1])*1024)
+    elif s[-1]=='M':
+        return int(float(s[:-1])*1024*1024)
+    else:
+        return int(s)
 
 def parse_url(namespace, depth, url):
     page = read_url(None, url)
@@ -75,11 +82,18 @@ def parse_url(namespace, depth, url):
             if namespace.accept is not None:
                 ok = any([href.endswith('.'+x) for x in namespace.accept.split(',')])
                 if not ok:
-                    print(':: extension not accepted; ignore ' + href) 
+                    print(':: extension not accepted; ignore ' + href, file=sys.stderr) 
+                    continue
+            if namespace.reject is not None:
+                ok = any([href.endswith('.'+x) for x in namespace.reject.split(',')])
+                if ok:
+                    print(':: extension not accepted; ignore ' + href, file=sys.stderr) 
                     continue
             (date, size) = (x.strip() for x in parsed[3].rsplit(' ', 1))
+            if namespace.min_size is not None or namespace.max_size is not None:
+                pass
             if namespace.min_depth is not None and depth < namespace.min_depth:
-                print(':: min depth not reached; ignore ' + href) 
+                print(':: min depth not reached; ignore ' + href, file=sys.stderr) 
             else:
                 print(date + '|' + size + '|' + url + '/' + href)    
 
@@ -90,7 +104,10 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpForm
 parser.add_argument('url', metavar='URL', type=str, nargs=1, help='The url where performing operation')
 parser.add_argument('--max-depth', metavar='LEVELS', type=int, help='Descend at mots levels')
 parser.add_argument('--min-depth', metavar='LEVELS', type=int, help='Ignore file links at levels less than levels')
-parser.add_argument('--accept', metavar='EXTENSIONS', type=str, help='Accept only the specified extensions')
+parser.add_argument('--min-size', metavar='SIZE', type=int, help='Ignore file with size less than the specified size')
+parser.add_argument('--max-size', metavar='SIZE', type=int, help='Ignore file with size greater than the specified size')
+parser.add_argument('--accept', metavar='EXTENSIONS', type=str, help='Accept only the files with the specified extensions')
+parser.add_argument('--reject', metavar='EXTENSIONS', type=str, help='Reject the files with the specified extensions')
 #parser_extract.add_argument('--force', help="Force a default replace entry for all matches", action='store_true')
 #parser_extract.add_argument('search', metavar='SEARCH', help='The string to search (ignoring case)')
 #parser_extract.add_argument('replacement', metavar='REPLACEMENT', help='The string used to initialize values of the translation map')
@@ -100,7 +117,6 @@ if len(sys.argv)==1:
     sys.exit(1)
 
 namespace = parser.parse_args()
-print(namespace.max_depth)
 try:
     parse_url(namespace, 0, namespace.url[0])
 except KeyboardInterrupt:
