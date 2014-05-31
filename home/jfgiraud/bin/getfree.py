@@ -107,7 +107,7 @@ def parse_url(namespace, depth, url):
                     if not namespace.no_messages:
                         print(':: date [%s] before [%s]; ignore %s' % (bdate, mdate, href), file=sys.stderr) 
                     continue
-            print(date + '|' + size + '|' + url + '/' + href)    
+            print(date + '|' + size + '|' + href)    
 
 def size_string(v):
     try:
