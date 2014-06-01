@@ -40,12 +40,17 @@ def csize(s):
     else:
         return int(s)
 
+DIR_REGEX = re.compile('<a href="([^"]*/)">[^<]*</a>', re.IGNORECASE)
+A_REGEX   = re.compile('<a href="([^"]*[^\/])">[^<]*</a>', re.IGNORECASE)
+
 def parse_url(namespace, depth, url):
     page = read_url(namespace.no_messages, None, url)
     for line in page.split('\n'):
-        if line.startswith('<IMG SRC="/icons/folder.gif" ALT="[DIR]">'):
-            line = line.replace('<IMG SRC="/icons/folder.gif" ALT="[DIR]"> <A HREF="', '')
-            line = line[:line.find('/')]
+        if 'Parent Directory' in line or 'Last modified' in line:
+            continue
+        search = DIR_REGEX.search(line)
+        if search:
+            line = search.group(1)
             tourl = url + '/' + line
             if namespace.max_depth is not None and (depth + 1 > namespace.max_depth):
                 if not namespace.no_messages:
@@ -53,15 +58,11 @@ def parse_url(namespace, depth, url):
             elif 'http://' not in line:
                 parse_url(namespace, depth+1, tourl)
             continue
-
-        pattern = '<IMG SRC="/icons/([\w\.]+)" ALT="\[([\w ]+)\]">'
-        m = re.match(pattern, line)
-        if m:
-            icon = m.group(1)
-            if icon == 'back.gif':
-                continue
+        search = A_REGEX.search(line)
+        if search:
             parsed = [ x.strip() for x in line.split('>') ]
-            href = url + '/' + parsed[1][9:-1]
+            tourl = search.group(1)
+            href = url + '/' + tourl
             if namespace.accept is not None:
                 ok = any([href.endswith('.'+x) for x in namespace.accept.split(',')])
                 if not ok:
@@ -74,7 +75,7 @@ def parse_url(namespace, depth, url):
                     if not namespace.no_messages:
                         print(':: extension not accepted; ignore ' + href, file=sys.stderr) 
                     continue
-            (date, size) = (x.strip() for x in parsed[3].rsplit(' ', 1))
+            (date, size) = (x.strip() for x in parsed[-1].rsplit(' ', 1))
             if namespace.min_size is not None:
                 bsize = csize(size)
                 msize = csize(namespace.min_size)
