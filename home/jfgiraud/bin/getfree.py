@@ -28,9 +28,7 @@ def read_url(no_messages, urlopener, url, encoding='latin1'):
         content = response.readall()
         return content.decode(encoding)
     except Exception as e:
-        #import traceback
-        #traceback.print_exc()
-        raise Exception('Erreur lors de la récupération de %s' % url)
+        raise Exception('Error while trying to read url %s' % url)
 
 def csize(s):
     if s[-1]=='k':
