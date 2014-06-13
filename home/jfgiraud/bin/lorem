@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#http://www.blindtextgenerator.com/text.php?textname=ANY-lorem
+#http://www.blindtextgenerator.com/text.php?textname=ANY-cicero
+#http://www.blindtextgenerator.com/text.php?textname=ANY-li-europan
+#http://www.blindtextgenerator.com/text.php?textname=FR-far-away-behind
+#http://www.blindtextgenerator.com/text.php?textname=FR-werther
+#http://www.blindtextgenerator.com/text.php?textname=FR-kafka
+#http://www.blindtextgenerator.com/text.php?textname=FR-pangram
+#http://www.blindtextgenerator.com/text.php?textname=EN-a-z-1
+
+function rawurlencode() {
+    # http://stackoverflow.com/questions/296536/urlencode-from-a-bash-script
+    local string="${1}"
+    local strlen=${#string}
+    local encoded=""
+    for (( pos=0 ; pos<strlen ; pos++ )); do
+	c=${string:$pos:1}
+	case "$c" in
+            [-_.~a-zA-Z0-9] ) o="${c}" ;;
+            * )               printf -v o '%%%02x' "'$c"
+	esac
+	encoded+="${o}"
+    done
+    echo "${encoded}"    # You can either set a return variable (FASTER) 
+    REPLY="${encoded}"   #+or echo the result (EASIER)... or both... :p
+}
+
+function rawurldecode() {
+    # http://stackoverflow.com/questions/296536/urlencode-from-a-bash-script
+    # Returns a string in which the sequences with percent (%) signs followed by
+    # two hex digits have been replaced with literal characters.
+    # This is perhaps a risky gambit, but since all escape characters must be
+    # encoded, we can replace %NN with \xNN and pass the lot to printf -b, which
+    # will decode hex for us
+    printf -v REPLY '%b' "${1//%/\\x}" # You can either set a return variable (FASTER)
+    echo "${REPLY}"  #+or echo the result (EASIER)... or both... :p
+}
+
+function=ANY-lorem
+state=$(printf '{"radioTextname":"idRadioTextname-%s","inputWords":"200","radioWords":true,"radioChars":false,"inputParas":"1","checkPTags":false,"fontFamily":0,"fontStyle":0,"fontWeight":0,"fontSize":2,"letterSpacing":0,"lineHeight":0,"textTransform":0,"textDecoration":0,"textAlign":0}' "$function")
+
+curl --cookie "state=$state" "http://www.blindtextgenerator.com/text.php?textname=$function"
+
