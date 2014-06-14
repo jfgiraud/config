@@ -1,13 +1,81 @@
 #!/bin/bash
 
-#http://www.blindtextgenerator.com/text.php?textname=ANY-lorem
-#http://www.blindtextgenerator.com/text.php?textname=ANY-cicero
-#http://www.blindtextgenerator.com/text.php?textname=ANY-li-europan
-#http://www.blindtextgenerator.com/text.php?textname=FR-far-away-behind
-#http://www.blindtextgenerator.com/text.php?textname=FR-werther
-#http://www.blindtextgenerator.com/text.php?textname=FR-kafka
-#http://www.blindtextgenerator.com/text.php?textname=FR-pangram
-#http://www.blindtextgenerator.com/text.php?textname=EN-a-z-1
+usage() {
+	cat <<-EOF
+NAME:
+
+        ${0##*/} - 
+
+SYNOPSYS:
+
+        ${0##*/}
+             -h, --help           display help
+                                  
+        
+With no FILE, or when FILE is -, read standard input.
+
+AUTHOR
+	Written by Jean-François Giraud.
+
+COPYRIGHT
+	Copyright © 2014 Jean-François Giraud.  License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+	This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+
+EOF
+	exit 0
+}
+
+error() {
+    STATUS="$1"
+    MSG="$2"
+    cat >&2 <<-EOF
+${0##*/}: $MSG
+Try \`${0##*/} -h\` for more information.
+EOF
+    exit 1
+}
+
+PARAMS=$(getopt -o "f:n:wcl:h" -l "function:,number:,words,chars,language:help" -- "$@")
+
+eval set -- "$PARAMS"
+
+language="FR"
+function="lorem"
+flag_words=true
+flag_chars=false
+number=207
+while [ "X$1" != "X--" ]; do
+    case "$1" in
+	-f|--function)
+	    shift
+	    function="$1"
+	    ;;
+	-l|--language)
+	    shift
+	    language="${1^^}"
+	    ;;
+	-n|--number)
+	    shift
+	    number="${1}"
+	    ;;
+	-w|--words)
+	    flag_words=true
+	    flag_chars=false
+	    ;;
+	-c|--chars)
+	    flag_words=false
+	    flag_chars=true
+	    ;;
+	-h|--help)
+	    usage
+	    ;;
+    esac
+    shift
+done
+
+shift
+
+declare -A functions=( ["lorem"]="ANY-lorem" ["cicero"]="ANY-cicero" ["li-europan"]="ANY-li-europan" ["werther"]="${language}-werther" ["kafka"]="${language}-kafka" ["pangram"]="${language}-pangram" ["a-z-1"]="EN-a-z-1")
 
 function rawurlencode() {
     # http://stackoverflow.com/questions/296536/urlencode-from-a-bash-script
@@ -26,19 +94,37 @@ function rawurlencode() {
     REPLY="${encoded}"   #+or echo the result (EASIER)... or both... :p
 }
 
-function rawurldecode() {
-    # http://stackoverflow.com/questions/296536/urlencode-from-a-bash-script
-    # Returns a string in which the sequences with percent (%) signs followed by
-    # two hex digits have been replaced with literal characters.
-    # This is perhaps a risky gambit, but since all escape characters must be
-    # encoded, we can replace %NN with \xNN and pass the lot to printf -b, which
-    # will decode hex for us
-    printf -v REPLY '%b' "${1//%/\\x}" # You can either set a return variable (FASTER)
-    echo "${REPLY}"  #+or echo the result (EASIER)... or both... :p
+lang_function=${functions["$function"]}
+
+curl -s "http://www.blindtextgenerator.com/text.php?textname=${lang_function}" > lorem.txt
+
+function head_c() {
+    head -c $number lorem.txt
+    echo
 }
 
-function=ANY-lorem
-state=$(printf '{"radioTextname":"idRadioTextname-%s","inputWords":"200","radioWords":true,"radioChars":false,"inputParas":"1","checkPTags":false,"fontFamily":0,"fontStyle":0,"fontWeight":0,"fontSize":2,"letterSpacing":0,"lineHeight":0,"textTransform":0,"textDecoration":0,"textAlign":0}' "$function")
+function head_w() {
+    local count=1
+    while IFS='\n' read line || [[ $line ]]; do
+        local p=""
+        for word in $line; do
+            count=$(($count+1))
+            if [ $count -le $number ]; then
+                echo -n "$p$word"
+                p=" "
+            else
+                break 2
+            fi
+        done   
+        echo 
+    done < lorem.txt
+    echo 
+}
 
-curl --cookie "state=$state" "http://www.blindtextgenerator.com/text.php?textname=$function"
+if [ "$flag_chars" == "true" ]; then
+    head_c
+elif [ "$flag_words" == "true" ]; then
+    head_w
+fi
 
+rm -f lorem.txt
