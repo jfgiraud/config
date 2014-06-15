@@ -16,14 +16,6 @@ parser.add_argument('-p', '--price', metavar='PRICE', type=float, help='Price of
 parser.add_argument('-n', '--number', metavar='NUMBER', type=int, help='Number of intervals')
 parser.add_argument('-d', '--divisor', metavar='NUMBER', type=int, help='Interval divisor')
 
-#parser.add_argument('--min-size', metavar='SIZE', type=size_string, help='Ignore file with size less than the specified size')
-#parser.add_argument('--max-size', metavar='SIZE', type=size_string, help='Ignore file with size greater than the specified size')
-#parser.add_argument('--accept', metavar='EXTENSIONS', type=str, help='Accept only the files with the specified extensions')
-#parser.add_argument('--reject', metavar='EXTENSIONS', type=str, help='Reject the files with the specified extensions')
-#parser.add_argument('--no-messages', help='Suppress messages', action='store_true')
-#parser.add_argument('--after', metavar='DATETIME', type=str, help='Reject the files with date/time before the specified datetime (YYYY-MM-DD hh:mm)')
-#parser.add_argument('--before', metavar='DATETIME', type=str, help='Reject the files with date/time after the specified datetime (YYYY-MM-DD hh:mm)')
-
 if len(sys.argv)==1: 
     parser.print_help()
     sys.exit(1)
@@ -40,6 +32,21 @@ for i in range(number, 0, -1):
     j = number-i+1
     p = price * i / parts
     if divisor is None:
-        print('%d %.2f' % (j, p))
+        print('%2d %7.2f' % (j, p))
     else:
-        print('%-2d %7.2f %7.2f' % (j, p, p/divisor))
+        print('%2d %7.2f %7.2f' % (j, p, p/divisor))
+
+
+#p  = f(n+1)/2
+
+
+
+
+
+
+
+
+
+
+
+
