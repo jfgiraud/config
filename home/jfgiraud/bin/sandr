@@ -10,7 +10,6 @@ SYNOPSYS:
 
         ${0##*/}
              -h, --help           display help
-             -v, --version        display version
              -s, --search         the string to search
              -S, --search-regex   the pattern to search
              -r, --replace        the string (or the pattern) used to replace all matches 
@@ -49,7 +48,7 @@ EOF
 }
 
 
-PARAMS=$(getopt -o "s:S:r:tcea:vh" -l "search:,search-regex:,replace:,simulate,confirm,extract-map,apply-map:,version,help" -- "$@")
+PARAMS=$(getopt -o "s:S:r:tcea:h" -l "search:,search-regex:,replace:,simulate,confirm,extract-map,apply-map:,help" -- "$@")
 
 eval set -- "$PARAMS"
 
@@ -95,10 +94,6 @@ while [ "X$1" != "X--" ]; do
 	    shift
 	    mapping="$1"
 	    ;;
-	-v|--version)
-	    echo "${0##*/} version 1.20"
-	    exit 0
-	    ;;
 	-h|--help)
 	    usage
 	    ;;
@@ -123,28 +118,32 @@ if [ -n "$eflag" ]; then
 	grepopt="E"
     fi
     cat $* | grep -${grepopt}i "${search}" -o | sort -u | while read match || [[ $match ]]; do
-	c=${match:0:1}
-	s=${match:1}
-	sc=${search:0:1}
-	ss=${search:1}
-	rc=${replace:0:1}
-	rs=${replace:1}
-	if [ "${match}" == "${search}" ]; then
-	    echo "$match:${replace}"	
-	elif [ "${match}" == "${search,,}" ]; then
-	    echo "$match:${replace,,}"
-	elif [ "${match}" == "${search^^}" ]; then
-	    echo "$match:${replace^^}"
-	elif [ "${match}" == "${search~~}" ]; then
-	    echo "$match:${replace~~}"
-	elif [ "${match}" == "${search,}" ]; then
-	    echo "$match:${replace,}"
-	elif [ "${match}" == "${search^}" ]; then
-	    echo "$match:${replace^}"
-	elif [ "${c^}${s,,}" == "${sc^}${ss,,}" ]; then
-	    echo "$match:${rc^}${rs,,}"
+	if [ -v sflag ]; then
+	    echo "$match:$replace"
 	else
-	    echo "$match:"
+	    c=${match:0:1}
+	    s=${match:1}
+	    sc=${search:0:1}
+	    ss=${search:1}
+	    rc=${replace:0:1}
+	    rs=${replace:1}
+	    if [ "${match}" == "${search}" ]; then
+		echo "$match:${replace}"	
+	    elif [ "${match}" == "${search,,}" ]; then
+		echo "$match:${replace,,}"
+	    elif [ "${match}" == "${search^^}" ]; then
+		echo "$match:${replace^^}"
+	    elif [ "${match}" == "${search~~}" ]; then
+		echo "$match:${replace~~}"
+	    elif [ "${match}" == "${search,}" ]; then
+		echo "$match:${replace,}"
+	    elif [ "${match}" == "${search^}" ]; then
+		echo "$match:${replace^}"
+	    elif [ "${c^}${s,,}" == "${sc^}${ss,,}" ]; then
+		echo "$match:${rc^}${rs,,}"
+	    else
+		echo "$match:"
+	    fi
 	fi
     done
     exit 0
@@ -171,10 +170,7 @@ do
 	fi
     else
 	cat "$file" > $ori 
-        awk -F':' 'function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
-            function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
-            function trim(s) { return rtrim(ltrim(s)); } 
-            NR==FNR {a[$1]=trim($2);next} {for (i in a) gsub(i,a[i])} 1' "$mapping" $ori > $tmp
+	cat $ori | eval $(tac z | awk -F ':' -v q="'" 'BEGIN{ print "sed" } { printf "-e %cs:%s:%s:g%c ", q, $1, $2,q }' | tr '\n' ' ') > $tmp
     fi
     if [ "$mode" == "dry-run" ]; then 
 	if ! diff "$ori" "$tmp" &> /dev/null; then
