@@ -1,6 +1,6 @@
 #!/bin/bash -i
 
-usage() {
+function usage() {
 	cat <<-EOF
 NAME:
 
@@ -37,7 +37,7 @@ EOF
 	exit 0
 }
 
-error() {
+function error() {
     STATUS="$1"
     MSG="$2"
     cat >&2 <<-EOF
@@ -47,13 +47,43 @@ EOF
     exit 1
 }
 
+function replace() {
+    local useregexp="$1"
+    local search="$2"
+    local replace="$3"
+    local script=$(mktemp)
+    cat > $script <<'EOF'
+#!/usr/bin/perl -w
+use strict;
+my $useregexp = ($ARGV[0] eq "true" ? 1 : 0);
+my $search=$ARGV[1];
+my $replace=$ARGV[2];
+if ($useregexp) {
+    $replace = '"' . $replace . '"'
+} else {
+    $search = quotemeta($search);
+}
+while (<STDIN>) {
+    if ($useregexp) { 
+        s/$search/$replace/gee;
+    } else {
+        s/$search/$replace/g;
+    }
+    print;
+}
+EOF
+    perl $script "$useregexp" "$search" "$replace"
+    rm -f $script
+}
+
+
 
 PARAMS=$(getopt -o "s:S:r:tcea:h" -l "search:,search-regex:,replace:,simulate,confirm,extract-map,apply-map:,help" -- "$@")
 
 eval set -- "$PARAMS"
 
 mode="no-confirm"
-
+sflag=false
 while [ "X$1" != "X--" ]; do
     case "$1" in
 	-s|--search)
@@ -63,7 +93,7 @@ while [ "X$1" != "X--" ]; do
 	-S|--search-regex)
 	    shift
 	    search="$1"
-	    sflag=1
+	    sflag=true
 	    ;;
 	-r|--replace)
 	    shift 
@@ -114,11 +144,11 @@ if [ -v eflag -a -z "$search" ]; then
 fi
 
 if [ -n "$eflag" ]; then
-    if [ -v sflag ]; then
+    if [ "$sflag" == "true" ]; then
 	grepopt="E"
     fi
     cat $* | grep -${grepopt}i "${search}" -o | sort -u | while read match || [[ $match ]]; do
-	if [ -v sflag ]; then
+	if [ "$sflag" == "true" ]; then
 	    echo "$match:$replace"
 	else
 	    c=${match:0:1}
@@ -163,11 +193,7 @@ do
     tmp=$(mktemp)
     ori=$(mktemp)
     if [ -z "$mapping" ]; then
-	if [ -v sflag ]; then
-	    cat "$file" | tee $ori | sed -e "s#${search//#/\\#}#${replace//#/\\#}#g" > $tmp
-	else
-	    cat "$file" | tee $ori | perl -pe "s:\\Q${search//:/\\:}:${replace//:/\\:}:g" > $tmp
-	fi
+	cat "$file" | tee $ori | replace "$sflag" "${search}" "${replace}" > $tmp
     else
 	cat "$file" > $ori 
 	cat $ori | eval $(tac z | awk -F ':' -v q="'" 'BEGIN{ print "sed" } { printf "-e %cs:%s:%s:g%c ", q, $1, $2,q }' | tr '\n' ' ') > $tmp
