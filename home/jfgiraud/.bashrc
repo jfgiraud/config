@@ -100,7 +100,6 @@ function chd() {
     done
 }
 
-
 function svn-cmp () {
     if [ ! -x "$HOME/bin/cdiff" ]; then
 	echo "Please install 'cdiff' program in $HOME/bin/ directory (https://github.com/ymattw/cdiff)"
@@ -262,8 +261,22 @@ function printx() {
 }
 
 function unicode() {
-    for c in à â é è ê ë î ï ô ö ù û ü ÿ ç; do printf "$c \\\\u00%.2x\n" "'$c"; done
+    local text="$1"
+    if [ -z "$text" ]; then
+	for c in à â é è ê ë î ï ô ö ù û ü ÿ ç; do printf "$c \\\\u00%.2x\n" "'$c"; done
+    else
+	for (( i=0; i<${#text}; i++ )); do
+	    local c=${foo:$i:1}
+	    printf "$c \\\\u00%.2x\n" "'$c"
+	done
+    fi
 }
+
+alias utf2iso='iconv --from-code=UTF-8 --to-code=ISO-8859-15'
+alias iso2utf='iconv --from-code=ISO-8859-15 --to-code=UTF-8'
+alias hexlify=$"hexdump -e '1/1 \"%.2x\"'"
+alias base64-encode='base64'
+alias base64-decode='base64 --decode'
 
 if [[ -e "$HOME/.bashrc_local" ]]; then
     source "$HOME/.bashrc_local"
