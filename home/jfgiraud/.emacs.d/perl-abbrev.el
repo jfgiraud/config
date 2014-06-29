@@ -4,7 +4,7 @@
 (setq perl-abbrev-list
   (list
      (cons "p-w" "#!/usr/bin/perl -w\n\nuse strict;\n\n|")
-     (cons "sub" "sub |{\n}")
+     (cons "sub" "sub | {\n}")
      (cons "if" "if (|) {\n}")
      (cons "ifndef" "if (not defined |) {\n}")
      (cons "ife" "if (|) {\n} else {\n}")

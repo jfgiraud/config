@@ -129,25 +129,51 @@ sub titleize($) {
     $s;
 }
 
+
+
+#    match many words         replace 
+#
+#    la_vie_est_belle         decamelize
+#    LA_VIE_EST_BELLE         decamelize + upper
+#    La Vie Est Belle         titleize
+#    LaVieEstBelle            camelize
+#    la vie est belle         lower
+#    LA VIE EST BELLE         upper
+#    La VIE est Belle         ucfirst + lower[1:]
+#    La vie est belle         idem
+#    la VIE est Belle         lcfirst + lower[1:]
+
+#    match one word         replace 
+#
+#    version                  lower                      
+#    VERSION                  upper
+#    VerSion                  camel
+#    Version                  title || camel
+#    VerSION                  
+#    ver_sion
+#    VER_SION
+
+
+
 sub compute_case($$$) {
     my ($match, $search, $repl) = @_;
     #printf "M:$match S:$search R:$repl\n";
     if ($match eq lc($match)) {
-	return lc($repl);
+	return "#1#".lc($repl);
     } elsif ($match eq uc($match)) {
-	return uc($repl);
+	return "#2#".uc($repl);
     } elsif ($match eq camelize($match)) {
-	return "#".camelize($repl);
+	return "#3#".camelize($repl);
     } elsif ($match eq decamelize($match)) {
-	return decamelize($repl);
+	return "#4#".decamelize($repl);
     } elsif ($match eq titleize($match)) {
-	return titleize($repl);
+	return "#5#".titleize($repl);
     } elsif ($match eq lcfirst($match)) {
-	return lcfirst($repl);
+	return "#6#".lcfirst($repl);
     } elsif ($match eq ucfirst($match)) {
-	return ucfirst($repl);
+	return "#7#".ucfirst($repl);
     } elsif ($match eq $search) {
-	return "#".$repl;
+	return "#8#".$repl;
     } 
     return "";
 }
@@ -156,13 +182,20 @@ my $extracted = {};
 sub extract($) {
     my ($fin) = @_;
     while (defined (my $line = <$fin>)) {
+	print "##### $line";
+	print "##### $search\n";
 	my @table;
 	if ($ignorecase) {
-	    @table = $line =~ m/$search/gi;
+	    while ($line =~ /($search)/gi) {
+		push(@table,"$1");
+	    }
 	} else {
-	    @table = $line =~ m/$search/g;
+	    while ($line =~ /($search)/g) {
+		push(@table,"$1");
+	    }
 	}
 	foreach my $match (@table) {
+	    print "#### $match\n";
 	    if (not exists $extracted->{$match}) {
 		my $repl = $match;
 		if ($use_regexp) {
