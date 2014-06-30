@@ -107,12 +107,12 @@ if ($use_regexp) {
 }
 
 sub camelize($) {
-    my $s = shift;
-    join('', map{ ucfirst $_ } split(/(?<=[A-Za-z])_(?=[A-Za-z])|\b/, $s));
+    my ($s) = @_;
+    return join('', map{ ucfirst $_ } split(/(?<=[A-Za-z])_(?=[A-Za-z])|\b|\s/, $s));
 }
 
 sub decamelize($) {
-    my $s = shift;
+    my ($s) = @_;
     $s =~ s{([^a-zA-Z]?)([A-Z]*)([A-Z])([a-z]?)}{
 		my $fc = pos($s)==0;
 		my ($p0,$p1,$p2,$p3) = ($1,lc$2,lc$3,$4);
@@ -120,52 +120,34 @@ sub decamelize($) {
 		$t .= $p3 ? $p1 ? "${p1}_$p2$p3" : "$p2$p3" : "$p1$p2";
 		$t;
 	}ge;
-    $s;
+    return $s;
 }
 
 sub titleize($) {
     my $s = shift;
     $s =~ s/(\w+)/\u\L$1/g;
-    $s;
+    return $s;
 }
 
-
-
-#    match many words         replace 
-#
-#    la_vie_est_belle         decamelize
-#    LA_VIE_EST_BELLE         decamelize + upper
-#    La Vie Est Belle         titleize
-#    LaVieEstBelle            camelize
-#    la vie est belle         lower
-#    LA VIE EST BELLE         upper
-#    La VIE est Belle         ucfirst + lower[1:]
-#    La vie est belle         idem
-#    la VIE est Belle         lcfirst + lower[1:]
-
-#    match one word         replace 
-#
-#    version                  lower                      
-#    VERSION                  upper
-#    VerSion                  camel
-#    Version                  title || camel
-#    VerSION                  
-#    ver_sion
-#    VER_SION
-
-
+sub word_count($) {
+    my ($s) = @_;
+    $s =~ s/_/ /g;
+    my $c = 0;
+    ++$c while ($s =~ /\S+/g);
+    return $c;
+}
 
 sub compute_case($$$) {
     my ($match, $search, $repl) = @_;
-    #printf "M:$match S:$search R:$repl\n";
-    if ($match eq lc($match)) {
-	return "#1#".lc($repl);
+
+    if (($match =~ /_/) && ($match eq decamelize($match))) {
+	return decamelize(camelize($repl));
+    } elsif (($match eq camelize($match)) && (word_count(decamelize($match))>=2)) {
+	return camelize($repl);
+    } elsif ($match eq lc($match)) {
+	return "#3#".lc($repl);
     } elsif ($match eq uc($match)) {
-	return "#2#".uc($repl);
-    } elsif ($match eq camelize($match)) {
-	return "#3#".camelize($repl);
-    } elsif ($match eq decamelize($match)) {
-	return "#4#".decamelize($repl);
+	return "#4#".uc($repl);
     } elsif ($match eq titleize($match)) {
 	return "#5#".titleize($repl);
     } elsif ($match eq lcfirst($match)) {
@@ -182,8 +164,6 @@ my $extracted = {};
 sub extract($) {
     my ($fin) = @_;
     while (defined (my $line = <$fin>)) {
-	print "##### $line";
-	print "##### $search\n";
 	my @table;
 	if ($ignorecase) {
 	    while ($line =~ /($search)/gi) {
@@ -195,7 +175,6 @@ sub extract($) {
 	    }
 	}
 	foreach my $match (@table) {
-	    print "#### $match\n";
 	    if (not exists $extracted->{$match}) {
 		my $repl = $match;
 		if ($use_regexp) {
