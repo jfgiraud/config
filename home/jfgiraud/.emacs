@@ -1,6 +1,7 @@
 ;; This buffer is for notes you don't want to save, and for Lisp evaluation.
 ;; If you want to create a file, visit that file with C-x C-f,
 ;; then enter the text in that file's own buffer.
+(add-to-list 'load-path "~/.emacs.d/")
 (add-to-list 'load-path "~/.emacs.d/color-theme/")
 (require 'color-theme)
 (load-file "~/.emacs.d/themes/color-theme-blackboard.el")
@@ -186,5 +187,15 @@
     (iswitchb-to-end files)))
 
 (add-hook 'iswitchb-make-buflist-hook 'iswitchb-system-buffers-to-end)
+
+
+;;; Mode abbrev ***************************************************************
+
+(add-hook 'perl-mode-hook                         
+  (function
+   (lambda ()
+     ; faire en sorte que le _ appartienne au mot
+     ; pour les abbréviations
+     (require 'perl-abbrev))))
 
 (message "main is loaded")

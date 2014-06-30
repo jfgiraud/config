@@ -1,0 +1,8 @@
+function goog {
+    local q="$1"
+    if [[ -n "$q" ]]; then
+        q="$(urlencode "$q")"
+    fi
+    links "http://www.google.com/search?ie=ISO-8859-1&hl=en&source=hp&q=$q&btnG=Google+Search&gbv=1"
+}
+    
