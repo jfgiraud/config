@@ -2,8 +2,10 @@
 $|=1 ;
 
 use strict ;
+use warnings;
 use Getopt::Long;
 use utf8;
+use Unicode::Normalize;
 
 binmode(STDOUT, ":utf8");
 binmode(STDERR, ":utf8");
@@ -106,6 +108,19 @@ if ($use_regexp) {
     $search = quotemeta($search);
 }
 
+sub deaccent($) {
+    my ($s) = @_;
+    $s = NFD($s);
+    $s =~ s/\p{Mn}//g;
+    return $s;
+}
+
+sub id($) {
+    my ($s) = @_;
+    $s =~ y/ /_/s;
+    return $s;
+}
+
 sub camelize($) {
     my ($s) = @_;
     return join('', map{ ucfirst $_ } split(/(?<=[A-Za-z])_(?=[A-Za-z])|\b|\s/, $s));
@@ -140,8 +155,10 @@ sub word_count($) {
 sub compute_case($$$) {
     my ($match, $search, $repl) = @_;
 
-    if (($match =~ /_/) && ($match eq decamelize($match))) {
-	return decamelize(camelize($repl));
+    if ($match =~ /^[A-Z_0-9]+$/) {
+	return id(uc(deaccent($repl)));
+    } elsif ($match =~ /^[a-z_0-9]+$/) {
+	return id(lc(deaccent($repl)));
     } elsif (($match eq camelize($match)) && (word_count(decamelize($match))>=2)) {
 	return camelize($repl);
     } elsif ($match eq lc($match)) {
