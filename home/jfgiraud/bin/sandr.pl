@@ -99,7 +99,7 @@ error(1,"--extract-map and --apply-map option are mutually exclusives") if ($ext
 error(1,"setting option --extract-map implies to set options --search and --replace") if ($extract_map && ((not defined $search) || (not defined $replace)));
 
 
-unless (caller) {
+if (0) {
     sub assert($$$$) {
 	my ($expect, $match, $search, $replace) = @_;
 	my $actual = compute_case($match, $search, $replace);
@@ -116,6 +116,7 @@ unless (caller) {
     assert('rep_lace_33', 'sea_rch', undef, 'rep_lace_33');
     assert('REP_LACE_33', 'SEA_RCH', undef, 'RépLäce33');
     assert('New', 'Old', undef, 'new');
+    assert('New word', 'Old', undef, 'new word');
     assert('New', 'Old', undef, 'New');
     assert('New', 'Old', undef, 'NEW');
     assert('NEW', 'OLD', undef, 'new');
@@ -129,9 +130,9 @@ unless (caller) {
     assert('THE NEW SÉNTENCE', 'THE OLD SENTENCE', undef, 'The New SÉNTENCE');
     assert('The new sentence', 'The OLD sentence', undef, 'The New sentence');
     assert('the new sentence', 'the OLD sentence', undef, 'The New sentence');
+    assert('The New sentence', 'the OLD sentence', 'the OLD sentence', 'The New sentence');
     exit 0;
 }
-
 
 if (@ARGV == 0) {
     push(@ARGV, '-');
@@ -189,6 +190,9 @@ sub word_count($) {
 
 sub compute_case($$$) {
     my ($match, $search, $repl) = @_;
+    if ((defined $search) && ($search eq $match)) {
+	return $repl;
+    }
     if ($match =~ /_/) {
 	my $repl2 = $repl;
 	if (($repl2 eq camelize($repl2)) && (word_count(decamelize($repl2))>=2)) {
@@ -206,36 +210,16 @@ sub compute_case($$$) {
     if ($match eq uc($match)) {
 	return uc($repl);
     }
-    if ($match eq ucfirst(lc($match))) {
-	return ucfirst(lc($repl));
-    }
-    if ($match eq titleize($match)) {
+    if (word_count($match) >= 2 && $match eq titleize($match)) {
         return titleize($repl);
     }
-
- 
-    # if ($match eq lcfirst($match) . lc(substr($match,1))) {
-    # 	return lcfirst($repl) . lc(substr($repl,1));
-    # } elsif ($match eq ucfirst($match) . uc(substr($match,1))) {
-    # 	return ucfirst($repl) . uc(substr($repl,1));
-    # } 
-
-# elsif (($match eq camelize($match)) && (word_count(decamelize($match))>=2)) {
-# 	return camelize($repl);
-#     } elsif ($match eq lc($match)) {
-# 	return "#3#".lc($repl);
-#     } elsif ($match eq uc($match)) {
-# 	return "#4#".uc($repl);
-#     } elsif ($match eq titleize($match)) {
-# 	return "#5#".titleize($repl);
-#     } elsif ($match eq lcfirst($match)) {
-# 	return "#6#".lcfirst($repl);
-#     } elsif ($match eq ucfirst($match)) {
-# 	return "#7#".ucfirst($repl);
-#     } elsif ($match eq $search) {
-# 	return "#8#".$repl;
-#     } 
-    return "";
+    if ($match =~ /^[A-Z]/) {
+	return ucfirst(lc($repl));
+    }
+    if ($match =~ /^[a-z]/) {
+	return lc($repl);
+    }
+    return $repl;
 }
 
 my $extracted = {};
