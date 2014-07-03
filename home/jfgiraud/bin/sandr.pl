@@ -35,7 +35,7 @@ GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
 	    'simulate|t' => \$simulate,
 	    'confirm|c' => \$confirm,
 	    'extract-map|e' => \$extract_map,
-	    'map-init-algorithm|l=s' => sub { $extract_map=1; $algorithm=$_[1] },
+	    'compute-case-method|m=s' => sub { $algorithm=$_[1] },
 	    'apply-map|a=s' => sub { $apply_map=1; $map_file=$_[1] },
 	    'help|h' => \$help,
 	    'debug|d' => \$debug
@@ -67,7 +67,7 @@ SYNOPSYS:
                                   a map created with found matches is displayed on standart 
                                   output. entries of this map will be setted with a default
                                   value
-             -l, --init-algorithm *********************************************
+ *********************************************
              -i, --ignore-case    search ingoring case
              -a, --apply-map      use a map to perform replacement
              -t, --simulate       perform a simulation for replacements
@@ -270,27 +270,32 @@ sub display_extracted {
     }
 }
 
-sub parse_file_to_map {
+sub parse_file_to_map($) {
     my ($name) = @_;
     my $h = {};
     open(MAP,"<$name") || die("Unable to open file '$name' ($!)\n") ;
     while (defined (my $line = <MAP>)) {
 	chomp($line);
 	my ($k, $v) = split(/ => /, $line, 2);
-	print "k====$k v####$v\n";
+	$h->{$k} = $v;
     }
     close(MAP);
     return $h;
 } 
 
-sub apply_map {
-    my ($fdin) = @_;
+sub apply_map($$) {
+    my ($fdin, $fdout) = @_;
     my $repl = parse_file_to_map("$map_file");
-    print $repl;
+    my $regexp = "(" . join("|", reverse(sort(keys(%$repl)))) . ")";
+    while (defined (my $line = <$fdin>)) {
+	$line =~ s/$regexp/$repl->{$1}/g;
+	printf $fdout $line;
+    }
 }
 
 foreach my $file (@ARGV) {
     my $fdin;
+    my $fdout = \*STDOUT;
     if (-d $file) {
 	next;
     }
@@ -303,7 +308,7 @@ foreach my $file (@ARGV) {
     if ($extract_map) {
 	extract($fdin);
     } elsif ($apply_map) {
-	apply_map($fdin);
+	apply_map($fdin, $fdout);
     } else {
 	die("Operation not supported");
     }
