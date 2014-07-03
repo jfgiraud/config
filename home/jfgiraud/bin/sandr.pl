@@ -2,8 +2,10 @@
 $|=1 ;
 
 use strict ;
+use warnings;
 use Getopt::Long;
 use utf8;
+use Unicode::Normalize;
 
 binmode(STDOUT, ":utf8");
 binmode(STDERR, ":utf8");
@@ -17,9 +19,14 @@ my $simulate=0;
 my $confirm=0;
 my $extract_map=0;
 my $apply_map=0;
+my $map_file=undef;
 my $debug=0;
 my $help=0;
 my $ignorecase=0;
+my $algorithm = 'default';
+my $algorithms = { 'no' => undef,
+		   'default' => \&compute_case
+};
 
 GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
 	    'search-regex|S=s' => sub { $use_regexp=1; $search=$_[1] },
@@ -28,7 +35,8 @@ GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
 	    'simulate|t' => \$simulate,
 	    'confirm|c' => \$confirm,
 	    'extract-map|e' => \$extract_map,
-	    'apply-map|a' => \$apply_map,
+	    'map-init-algorithm|l=s' => sub { $extract_map=1; $algorithm=$_[1] },
+	    'apply-map|a=s' => sub { $apply_map=1; $map_file=$_[1] },
 	    'help|h' => \$help,
 	    'debug|d' => \$debug
 );
@@ -59,6 +67,7 @@ SYNOPSYS:
                                   a map created with found matches is displayed on standart 
                                   output. entries of this map will be setted with a default
                                   value
+             -l, --init-algorithm *********************************************
              -i, --ignore-case    search ingoring case
              -a, --apply-map      use a map to perform replacement
              -t, --simulate       perform a simulation for replacements
@@ -95,15 +104,66 @@ error(1,"setting option --simulate makes no sense with option --extract-map") if
 error(1,"setting option --confirm makes no sense with option --extract-map") if ($extract_map && $confirm);
 error(1,"--extract-map and --apply-map option are mutually exclusives") if ($extract_map && $apply_map);
 error(1,"setting option --extract-map implies to set options --search and --replace") if ($extract_map && ((not defined $search) || (not defined $replace)));
+error(1,"unknown algorithm '$algorithm' for option --init-algorithm") if (not exists ($algorithms->{$algorithm}));
+
+if (0) {
+    sub assert($$$$) {
+	my ($expect, $match, $search, $replace) = @_;
+	my $actual = compute_case($match, $search, $replace);
+	if ($expect ne $actual) {
+	    if (not defined $search) {
+		$search="";
+	    }
+	    printf STDERR "Expects      <$expect>\nBut receives <$actual>\nFor <$match> <$search> <$replace>\n";
+	    exit 1;
+	}
+    }
+    assert('REP_LACE_33', 'SEA_RCH', undef, 'rép läce 33');
+    assert('rep_lace_33', 'sea_rch', undef, 'rép läce 33');
+    assert('rep_lace_33', 'sea_rch', undef, 'rep_lace_33');
+    assert('REP_LACE_33', 'SEA_RCH', undef, 'RépLäce33');
+    assert('New', 'Old', undef, 'new');
+    assert('New word', 'Old', undef, 'new word');
+    assert('New', 'Old', undef, 'New');
+    assert('New', 'Old', undef, 'NEW');
+    assert('NEW', 'OLD', undef, 'new');
+    assert('NEW', 'OLD', undef, 'New');
+    assert('NEW', 'OLD', undef, 'NEW');
+    assert('The New Sentence', 'The Old Sentence', undef, 'The new sentence');
+    assert('The New Sentence', 'The Old Sentence 33', undef, 'The new sentence');
+    assert('The new sentence', 'The old sentence', undef, 'The New sentence');
+    assert('The new séntence', 'The old sentence', undef, 'The New séntence');
+    assert('THE NEW SÉNTENCE', 'THE OLD SENTENCE', undef, 'The New séntence');
+    assert('THE NEW SÉNTENCE', 'THE OLD SENTENCE', undef, 'The New SÉNTENCE');
+    assert('The new sentence', 'The OLD sentence', undef, 'The New sentence');
+    assert('the new sentence', 'the OLD sentence', undef, 'The New sentence');
+    assert('The New sentence', 'the OLD sentence', 'the OLD sentence', 'The New sentence');
+    exit 0;
+}
 
 if (@ARGV == 0) {
     push(@ARGV, '-');
 }
 
-if ($use_regexp) {
-    $replace = '"' . $replace . '"';
-} else {
-    $search = quotemeta($search);
+if (not $apply_map) {
+    if ($use_regexp) {
+	$replace = '"' . $replace . '"';
+    } else {
+	$search = quotemeta($search);
+    }
+}
+
+sub deaccent($) {
+    my ($s) = @_;
+    $s = NFD($s);
+    $s =~ s/\p{Mn}//g;
+    return $s;
+}
+
+sub id($) {
+    my ($s) = @_;
+    $s =~ y/ /_/s;
+    return $s;
 }
 
 sub camelize($) {
@@ -113,7 +173,7 @@ sub camelize($) {
 
 sub decamelize($) {
     my ($s) = @_;
-    $s =~ s{([^a-zA-Z]?)([A-Z]*)([A-Z])([a-z]?)}{
+    $s =~ s{([^a-zA-Z0-9]?)([A-Z0-9]*)([A-Z0-9])([a-z]?)}{
 		my $fc = pos($s)==0;
 		my ($p0,$p1,$p2,$p3) = ($1,lc$2,lc$3,$4);
 		my $t = $p0 || $fc ? $p0 : '_';
@@ -139,31 +199,43 @@ sub word_count($) {
 
 sub compute_case($$$) {
     my ($match, $search, $repl) = @_;
-
-    if (($match =~ /_/) && ($match eq decamelize($match))) {
-	return decamelize(camelize($repl));
-    } elsif (($match eq camelize($match)) && (word_count(decamelize($match))>=2)) {
-	return camelize($repl);
-    } elsif ($match eq lc($match)) {
-	return "#3#".lc($repl);
-    } elsif ($match eq uc($match)) {
-	return "#4#".uc($repl);
-    } elsif ($match eq titleize($match)) {
-	return "#5#".titleize($repl);
-    } elsif ($match eq lcfirst($match)) {
-	return "#6#".lcfirst($repl);
-    } elsif ($match eq ucfirst($match)) {
-	return "#7#".ucfirst($repl);
-    } elsif ($match eq $search) {
-	return "#8#".$repl;
+    if ((defined $search) && ($search eq $match)) {
+	return $repl;
+    }
+    if ($match =~ /_/) {
+	my $repl2 = $repl;
+	if (($repl2 eq camelize($repl2)) && (word_count(decamelize($repl2))>=2)) {
+	    $repl2 = decamelize($repl2);
+	}
+	if ($match =~ /^[A-Z_0-9]+$/) {
+	    return id(uc(deaccent($repl2)));
+	} elsif ($match =~ /^[a-z_0-9]+$/) {
+	    return id(lc(deaccent($repl2)));
+	} 
     } 
-    return "";
+    if ($match eq lc($match)) {
+	return lc($repl);
+    }
+    if ($match eq uc($match)) {
+	return uc($repl);
+    }
+    if (word_count($match) >= 2 && $match eq titleize($match)) {
+        return titleize($repl);
+    }
+    if ($match =~ /^[A-Z]/) {
+	return ucfirst(lc($repl));
+    }
+    if ($match =~ /^[a-z]/) {
+	return lc($repl);
+    }
+    return $repl;
 }
 
 my $extracted = {};
 sub extract($) {
-    my ($fin) = @_;
-    while (defined (my $line = <$fin>)) {
+    my ($fdin) = @_;
+    my ($function) = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default"}; 
+    while (defined (my $line = <$fdin>)) {
 	my @table;
 	if ($ignorecase) {
 	    while ($line =~ /($search)/gi) {
@@ -186,7 +258,7 @@ sub extract($) {
 		} else {
 		    $repl = $replace;
 		}
-		$extracted->{$match} = compute_case($match,$search,$repl);
+		$extracted->{$match} = (defined $function ? &$function($match,$search,$repl) : "");
 	    }
 	}
     }
@@ -194,8 +266,27 @@ sub extract($) {
 
 sub display_extracted {
     foreach my $k (keys(%$extracted)) {
-	printf "$k: $extracted->{$k}\n"
+	printf "$k => $extracted->{$k}\n"
     }
+}
+
+sub parse_file_to_map {
+    my ($name) = @_;
+    my $h = {};
+    open(MAP,"<$name") || die("Unable to open file '$name' ($!)\n") ;
+    while (defined (my $line = <MAP>)) {
+	chomp($line);
+	my ($k, $v) = split(/ => /, $line, 2);
+	print "k====$k v####$v\n";
+    }
+    close(MAP);
+    return $h;
+} 
+
+sub apply_map {
+    my ($fdin) = @_;
+    my $repl = parse_file_to_map("$map_file");
+    print $repl;
 }
 
 foreach my $file (@ARGV) {
@@ -211,6 +302,8 @@ foreach my $file (@ARGV) {
     }
     if ($extract_map) {
 	extract($fdin);
+    } elsif ($apply_map) {
+	apply_map($fdin);
     } else {
 	die("Operation not supported");
     }
@@ -223,3 +316,4 @@ if ($extract_map) {
     display_extracted;
     exit 0;
 }
+
