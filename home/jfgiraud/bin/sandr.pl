@@ -19,9 +19,14 @@ my $simulate=0;
 my $confirm=0;
 my $extract_map=0;
 my $apply_map=0;
+my $map_file=undef;
 my $debug=0;
 my $help=0;
 my $ignorecase=0;
+my $algorithm = 'default';
+my $algorithms = { 'no' => undef,
+		   'default' => \&compute_case
+};
 
 GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
 	    'search-regex|S=s' => sub { $use_regexp=1; $search=$_[1] },
@@ -30,7 +35,8 @@ GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
 	    'simulate|t' => \$simulate,
 	    'confirm|c' => \$confirm,
 	    'extract-map|e' => \$extract_map,
-	    'apply-map|a' => \$apply_map,
+	    'map-init-algorithm|l=s' => sub { $extract_map=1; $algorithm=$_[1] },
+	    'apply-map|a=s' => sub { $apply_map=1; $map_file=$_[1] },
 	    'help|h' => \$help,
 	    'debug|d' => \$debug
 );
@@ -61,6 +67,7 @@ SYNOPSYS:
                                   a map created with found matches is displayed on standart 
                                   output. entries of this map will be setted with a default
                                   value
+             -l, --init-algorithm *********************************************
              -i, --ignore-case    search ingoring case
              -a, --apply-map      use a map to perform replacement
              -t, --simulate       perform a simulation for replacements
@@ -97,7 +104,7 @@ error(1,"setting option --simulate makes no sense with option --extract-map") if
 error(1,"setting option --confirm makes no sense with option --extract-map") if ($extract_map && $confirm);
 error(1,"--extract-map and --apply-map option are mutually exclusives") if ($extract_map && $apply_map);
 error(1,"setting option --extract-map implies to set options --search and --replace") if ($extract_map && ((not defined $search) || (not defined $replace)));
-
+error(1,"unknown algorithm '$algorithm' for option --init-algorithm") if (not exists ($algorithms->{$algorithm}));
 
 if (0) {
     sub assert($$$$) {
@@ -138,10 +145,12 @@ if (@ARGV == 0) {
     push(@ARGV, '-');
 }
 
-if ($use_regexp) {
-    $replace = '"' . $replace . '"';
-} else {
-    $search = quotemeta($search);
+if (not $apply_map) {
+    if ($use_regexp) {
+	$replace = '"' . $replace . '"';
+    } else {
+	$search = quotemeta($search);
+    }
 }
 
 sub deaccent($) {
@@ -224,8 +233,9 @@ sub compute_case($$$) {
 
 my $extracted = {};
 sub extract($) {
-    my ($fin) = @_;
-    while (defined (my $line = <$fin>)) {
+    my ($fdin) = @_;
+    my ($function) = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default"}; 
+    while (defined (my $line = <$fdin>)) {
 	my @table;
 	if ($ignorecase) {
 	    while ($line =~ /($search)/gi) {
@@ -248,7 +258,7 @@ sub extract($) {
 		} else {
 		    $repl = $replace;
 		}
-		$extracted->{$match} = compute_case($match,$search,$repl);
+		$extracted->{$match} = (defined $function ? &$function($match,$search,$repl) : "");
 	    }
 	}
     }
@@ -256,8 +266,27 @@ sub extract($) {
 
 sub display_extracted {
     foreach my $k (keys(%$extracted)) {
-	printf "$k: $extracted->{$k}\n"
+	printf "$k => $extracted->{$k}\n"
     }
+}
+
+sub parse_file_to_map {
+    my ($name) = @_;
+    my $h = {};
+    open(MAP,"<$name") || die("Unable to open file '$name' ($!)\n") ;
+    while (defined (my $line = <MAP>)) {
+	chomp($line);
+	my ($k, $v) = split(/ => /, $line, 2);
+	print "k====$k v####$v\n";
+    }
+    close(MAP);
+    return $h;
+} 
+
+sub apply_map {
+    my ($fdin) = @_;
+    my $repl = parse_file_to_map("$map_file");
+    print $repl;
 }
 
 foreach my $file (@ARGV) {
@@ -273,6 +302,8 @@ foreach my $file (@ARGV) {
     }
     if ($extract_map) {
 	extract($fdin);
+    } elsif ($apply_map) {
+	apply_map($fdin);
     } else {
 	die("Operation not supported");
     }
@@ -280,7 +311,6 @@ foreach my $file (@ARGV) {
 	close($fdin);
     }
 }
-
 
 if ($extract_map) {
     display_extracted;
