@@ -24,7 +24,7 @@ my $debug=0;
 my $help=0;
 my $ignorecase=0;
 my $algorithm = 'default';
-my $algorithms = { 'no' => undef,
+my $algorithms = { 'none' => undef,
 		   'default' => \&compute_case
 };
 
@@ -104,6 +104,7 @@ error(1,"setting option --simulate makes no sense with option --extract-map") if
 error(1,"setting option --confirm makes no sense with option --extract-map") if ($extract_map && $confirm);
 error(1,"--extract-map and --apply-map option are mutually exclusives") if ($extract_map && $apply_map);
 error(1,"setting option --extract-map implies to set options --search and --replace") if ($extract_map && ((not defined $search) || (not defined $replace)));
+error(1,"--search and --replace are required when --apply-map is not used") if ((not $apply_map) && ((not defined $search) || (not defined $replace)));
 error(1,"unknown algorithm '$algorithm' for option --init-algorithm") if (not exists ($algorithms->{$algorithm}));
 
 if (0) {
@@ -234,7 +235,7 @@ sub compute_case($$$) {
 my $extracted = {};
 sub extract($) {
     my ($fdin) = @_;
-    my ($function) = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default"}; 
+    my $function = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default"}; 
     while (defined (my $line = <$fdin>)) {
 	my @table;
 	if ($ignorecase) {
@@ -293,6 +294,32 @@ sub apply_map($$) {
     }
 }
 
+sub algo($$$) {
+    my ($match, $search, $replace) = @_;
+    my $function = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default"}; 
+    return (defined $function ? &$function($match,$search,$replace) : $replace);
+}
+
+sub apply_repl($$) {
+    my ($fdin, $fdout) = @_;
+    while (defined (my $line = <$fdin>)) {
+        if ($use_regexp) {
+            if ($ignorecase) {
+                $line =~ s/$search/$replace/giee;
+	    } else {
+	        $line =~ s/$search/$replace/gee;
+	    }
+        } else {
+            if ($ignorecase) {
+                $line =~ s/($search)/algo($1,$search,$replace)/gei;
+	    } else {
+                $line =~ s/($search)/algo($1,$search,$replace)/ge;
+	    }
+        }
+	printf $fdout $line;
+    }
+}
+
 foreach my $file (@ARGV) {
     my $fdin;
     my $fdout = \*STDOUT;
@@ -309,6 +336,8 @@ foreach my $file (@ARGV) {
 	extract($fdin);
     } elsif ($apply_map) {
 	apply_map($fdin, $fdout);
+    } elsif (defined $search && defined $replace) { 
+        apply_repl($fdin, $fdout);
     } else {
 	die("Operation not supported");
     }
