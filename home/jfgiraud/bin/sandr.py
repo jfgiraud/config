@@ -1,7 +1,13 @@
 #!/usr/bin/python
 
 import getopt
+import os
+import re
 import sys
+
+# python sandr.py -e -S '((\w+)jour)' -r 'helLO\1' -i aaa
+# python sandr.py -e -s BONjour -r helLO -i aaa
+# bug python sandr.py -e -s '((\w+)jour)' -r 'helLO\1' -i aaa
 
 def usage(retval=0):
     print('''NAME:
@@ -20,7 +26,6 @@ SYNOPSYS:
                                   a map created with found matches is displayed on standart 
                                   output. entries of this map will be setted with a default
                                   value
- *********************************************
              -i, --ignore-case    search ingoring case
              -a, --apply-map      use a map to perform replacement
              -t, --simulate       perform a simulation for replacements
@@ -31,7 +36,7 @@ SYNOPSYS:
 With no FILE, or when FILE is -, read standard input.
 
 AUTHOR
-	Written by Jean-Francois Giraud.
+	Written by Jean-François Giraud.
 
 COPYRIGHT
 	Copyright (c) 2012-2014 Jean-François Giraud.  
@@ -41,23 +46,34 @@ COPYRIGHT
     ''' % {'prog': sys.argv[0]})
     sys.exit(retval)
 
+search = None
+replace = None
+flag_useregexp = False
+flag_ignorecase = False
+flag_simulate = False
+flag_confirm = False
+flag_extractmap = False
+applymap = None
+algorithm = None
 
-search=None
-replace=None
-use_regexp=False
-ignorecase=False
+def compute_case(m,s,r, flag_useregexp):
+    if not flag_useregexp:
+        if s == m:
+            return r
+        if s == m.swapcase():
+            return r.swapcase()
+        for f in [ 'lower', 'upper', 'title', 'capitalize' ]:
+            if m == getattr(m, f)():
+                return getattr(r, f)()
+    else:
+        return '*'+m
 
-# GetOptions (
-# 	    'ignore-case|i' => \$ignorecase,
-# 	    'simulate|t' => \$simulate,
-# 	    'confirm|c' => \$confirm,
-# 	    'extract-map|e' => \$extract_map,
-# 	    'compute-case-method|m=s' => \$algorithm,
-# 	    'apply-map|a=s' => sub { $apply_map=1; $map_file=$_[1] },
-
+algorithms = { 'id': lambda m,s,r: r,
+               'default_extract': compute_case
+}
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:i", ["help","search=","search-regexp=","replace=","ignore-case"])
+    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:iscea:m:", ["help","search=","search-regexp=","replace=","ignore-case","simulate","confirm","extract-map","apply-map=","method="])
 except getopt.GetoptError:
     usage(2)
 
@@ -70,8 +86,64 @@ for o, a in opts:
         replace = a
     if o in ("-S", "--search-regexp"):
         search = a
-        use_regexp = True
+        flag_useregexp = True
     if o in ("-i", "--ignore-case"):
-        ignorecase = True
+        flag_ignorecase = True
+    if o in ("-t", "--simulate"):
+        flag_simulate = True
+    if o in ("-c", "--confirm"):
+        flag_confirm = True
+    if o in ("-e", "--extract-map"):
+        flag_extractmap = True
+    if o in ("-a", "--apply-map"):
+        applymap = a
 
-usage(0)
+def error(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+if flag_extractmap and flag_simulate:
+    error("setting option --simulate makes no sense with option --extract-map") 
+
+if flag_extractmap and flag_confirm:
+    error("setting option --confirm makes no sense with option --extract-map") 
+
+if flag_extractmap and applymap:
+    error("--extract-map and --apply-map option are mutually exclusives") 
+
+if flag_extractmap and (search is None or replace is None):
+    error("setting option --extract-map implies to set options --search and --replace") 
+
+if (applymap is not None) and (search is None or replace is None):
+    error("--search and --replace are required when --apply-map is not used")
+
+if (algorithm is not None) and algorithm not in algorithms:
+    error("unknown algorithm '%s' for option --compute-case-method" % (algorithm)) 
+
+
+def extract(fdin, reflags):
+    pattern = re.compile(search, reflags)
+    found = set()
+    for line in fdin:
+        found.update(pattern.findall(line))
+    return found
+
+if len(args) == 0:
+    args = [ "-" ]
+
+if flag_extractmap:
+    extracted = set()
+    reflags= re.I if flag_ignorecase else 0
+    for file in args:
+        with os.dup(sys.stdin) if file == '-' else open(file, 'rt') as fdin:
+            extracted.update(extract(fdin, reflags))
+    method = algorithms.get(algorithm, algorithms['default_extract'])
+    for match in extracted:
+        print('-----')
+        print(search)
+        print(replace)
+        print(match)
+        if flag_useregexp:
+            match = match[0]
+        replace = re.sub(search, replace, match, flags=reflags)
+        print(match, '=>', method(match, search, replace, flag_useregexp))
