@@ -57,16 +57,14 @@ applymap = None
 algorithm = None
 
 def compute_case(m,s,r, flag_useregexp):
-    if not flag_useregexp:
-        if s == m:
-            return r
-        if s == m.swapcase():
-            return r.swapcase()
-        for f in [ 'lower', 'upper', 'title', 'capitalize' ]:
-            if m == getattr(m, f)():
-                return getattr(r, f)()
-    else:
-        return '*'+m
+    if s == m:
+        return r
+    if s == m.swapcase():
+        return r.swapcase()
+    for f in [ 'lower', 'upper', 'title', 'capitalize' ]:
+        if m == getattr(m, f)():
+            return getattr(r, f)()
+    return "*TODO*" + r
 
 algorithms = { 'id': lambda m,s,r: r,
                'default_extract': compute_case
@@ -120,13 +118,25 @@ if (applymap is not None) and (search is None or replace is None):
 if (algorithm is not None) and algorithm not in algorithms:
     error("unknown algorithm '%s' for option --compute-case-method" % (algorithm)) 
 
-
-def extract(fdin, reflags):
-    pattern = re.compile(search, reflags)
+def extract(fdin):
     found = set()
-    for line in fdin:
-        found.update(pattern.findall(line))
-    return found
+    if flag_useregexp:
+        reflags= re.I if flag_ignorecase else 0
+        pattern = re.compile(search, reflags)
+        for line in fdin:
+            found.update(pattern.findall(line))
+        return found
+    else:
+        length = len(search)
+        text = search.lower() if flag_ignorecase else search
+        for line in fdin:
+            line2 = line.lower() if flag_ignorecase else line
+            start = line2.find(text)
+            while start >= 0:
+                end = start + length
+                found.add(line[start:end])
+                start = line2.find(text, end)
+        return found
 
 if len(args) == 0:
     args = [ "-" ]
@@ -136,14 +146,15 @@ if flag_extractmap:
     reflags= re.I if flag_ignorecase else 0
     for file in args:
         with os.dup(sys.stdin) if file == '-' else open(file, 'rt') as fdin:
-            extracted.update(extract(fdin, reflags))
+            extracted.update(extract(fdin))
     method = algorithms.get(algorithm, algorithms['default_extract'])
     for match in extracted:
-        print('-----')
-        print(search)
-        print(replace)
-        print(match)
-        if flag_useregexp:
-            match = match[0]
-        replace = re.sub(search, replace, match, flags=reflags)
-        print(match, '=>', method(match, search, replace, flag_useregexp))
+        if not flag_useregexp:
+            replace = re.sub(search, replace, match, flags=reflags)
+            print(match, '=>', method(match, search, replace, flag_useregexp))
+        else:
+            if type(match)==tuple:
+                match = match[0]
+            replace = re.sub(search, replace, match, flags=reflags)
+            print(match, '=>', method(match, search, replace, flag_useregexp))
+
