@@ -51,9 +51,6 @@ bindsym Control+XF86AudioRaiseVolume exec /usr/bin/amixer -q set PCM 2+ unmute
 bindsym Control+Shift+XF86AudioLowerVolume exec /usr/bin/amixer -q set PCM 0% unmute
 bindsym Control+Shift+XF86AudioRaiseVolume exec /usr/bin/amixer -q set PCM 100% unmute
 
-bindsym Control+Mod1+End exec /usr/bin/slock
-bindsym Control+Mod1+Insert exec /home/jfgiraud/.cccv
-
 bindsym $mod+b border toggle
 
 # change focus
@@ -118,6 +115,10 @@ bindsym $mod+underscore workspace 8
 bindsym $mod+ccedilla workspace 9
 bindsym $mod+agrave workspace 10
 
+bindsym $mod+Control+Left workspace prev
+bindsym $mod+Control+Right workspace next
+bindsym $mod+w workspace back_and_forth
+
 # move focused container to workspace
 bindsym $mod+Shift+ampersand move container to workspace 1
 bindsym $mod+Shift+eacute move container to workspace 2
@@ -129,6 +130,7 @@ bindsym $mod+Shift+egrave move container to workspace 7
 bindsym $mod+Shift+underscore move container to workspace 8
 bindsym $mod+Shift+ccedilla move container to workspace 9
 bindsym $mod+Shift+agrave move container to workspace 10
+
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
