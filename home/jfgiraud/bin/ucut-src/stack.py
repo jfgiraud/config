@@ -213,7 +213,7 @@ class Reader:
                     self.s.append(int(token))
                 elif re.match('^(-)?((\\d*\.)?\\d+?([eE][+-]?\\d+)?|nan|inf)$', token):
                     self.s.append(float(token))
-                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn", "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot", "keep", "pop", "push", "remove", "swap", "value", "insert", "empty", "clear", "unpick", "get", "upper", "lower", "capitalize", "title", "deaccent", "slugify", "length", "startswith", "endswith", "reverse", "replace", "concat", "strip", "lstrip", "rstrip", "split", "rsplit", "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=', 'eval', 'sto', 'and', 'or', 'not', 'xor', '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
+                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn", "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot", "keep", "pop", "push", "remove", "swap", "value", "insert", "empty", "clear", "unpick", "get", "upper", "lower", "capitalize", "title", "deaccent", "slugify", "length", "startswith", "endswith", "contains", "reverse", "replace", "concat", "strip", "lstrip", "rstrip", "split", "rsplit", "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=', 'eval', 'sto', 'and', 'or', 'not', 'xor', '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
                     
                     associations = {
                         '+': '_add',
@@ -771,6 +771,11 @@ class Stack:
         pref = self.pop()
         text = self.pop()
         self.__push_as_bool(text.endswith(pref))
+    def contains(self):
+        self.__assert_string([1, 2], 'contains')
+        subst = self.pop()
+        text = self.pop()
+        self.__push_as_bool(subst in text)
     def format(self):
         self.__assert_string([2], 'format')
         args = self.pop()

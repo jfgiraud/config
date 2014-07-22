@@ -137,6 +137,8 @@ if __name__ == '__main__':
     assertStackOp([False], None, ['LOREM IPSUM', 'ABC'], 'startswith')
     assertStackOp([True], None, ['LOREM IPSUM', 'IPSUM'], 'endswith')
     assertStackOp([False], None, ['LOREM IPSUM', 'ABC'], 'endswith')
+    assertStackOp([False], None, ['LOREM IPSUM', 'ABC'], 'contains')
+    assertStackOp([True], None, ['LOREM IPSUM', ' IPS'], 'contains')
     assertStackOp(['L*REM IPSUM'], None, ['LOREM IPSUM', 'O', '*'], 'replace')
     assertStackOp(['lorem ipsum'], None, ['\t lorem ipsum  '], 'strip')
     assertStackOp(['lorem ipsum  '], None, ['\t lorem ipsum  '], 'lstrip')
