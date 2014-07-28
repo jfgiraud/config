@@ -123,6 +123,8 @@ class Reader:
                     raise Exception('Unable to reach token "%s".' % '" or "'.join(until))
                 else:
                     raise Exception('Unable to reach token "%s".' % until)
+            else:
+                return
         token = tokens.pop(0)
         while token:
             if until and (token == until) or (type(until) == list and token in until) :
