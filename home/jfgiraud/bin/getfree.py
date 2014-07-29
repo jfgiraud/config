@@ -38,15 +38,59 @@ def csize(s):
     else:
         return int(s)
 
-DIR_REGEX = re.compile('<a href="([^"]*/)">[^<]*</a>', re.IGNORECASE)
-A_REGEX   = re.compile('<a href="([^"]*[^\/])">[^<]*</a>', re.IGNORECASE)
+class Conf:
+    
+    def __init__(self, dir_regex, a_regex, date_fmt, line_sep):
+        self.DIR_REGEX = re.compile(dir_regex, re.IGNORECASE)
+        self.A_REGEX = re.compile(a_regex, re.IGNORECASE)
+        self.DATE_FMT = date_fmt
+        self.LINE_SEP = line_sep
 
-def parse_url(namespace, depth, url):
+
+def xxx(s,n,l=2):
+    return '(' + '|'.join([str(x).zfill(l) for x in range(s,n+1)]) + ')'
+
+def y(f):
+    f = f.replace('DD', xxx(1,31))
+    f = f.replace('D', xxx(1,31,1))
+    f = f.replace('MMM', '\w+')
+    f = f.replace('MM', xxx(1,12))
+    f = f.replace('M', xxx(1,12,1))
+    f = f.replace('YYYY', '([12][0-9]{3})')
+    f = f.replace('HH', xxx(0,23))
+    f = f.replace('H', xxx(0,23,1))
+    f = f.replace('hh', xxx(1,12))
+    f = f.replace('h', xxx(1,12,1))
+    f = f.replace('A', '(AM|PM)')
+    f = f.replace('a', '(am|pm)')
+    f = f.replace('mm', xxx(0,59))
+    f = f.replace('m', xxx(0,59,1))
+    f = f.replace(' ', '\s+')
+    return '.*' + f + '.*'
+
+def detect_conf(page):
+    page = page.replace('\n', '')
+    date_fmt = next((fmt for fmt in [ y('DD-MMM-YYYY HH:mm'), y('M/D/YYYY h:mm A') ] if re.match(fmt, page, re.IGNORECASE)), None)
+    #print(",,,,",date_fmt)
+    #print(re.match(date_fmt, page.replace('\n',''), re.IGNORECASE))
+    line_sep = '<br>' if re.match('.*</a><br>.*', page, re.IGNORECASE) else '\n'
+    #line_sep = '\n'
+    print(',,,,',line_sep)
+    return Conf('<a href="([^"]*/)">[^<]*</a>', 
+                '<a href="([^"]*[^\/])">[^<]*</a>', 
+                date_fmt, 
+                line_sep)
+    
+def parse_url(namespace, depth, url, conf=None):
     page = read_url(namespace.no_messages, None, url)
-    for line in page.split('\n'):
+    if not 'Parent Directory' in page:
+        return
+    if conf is None:
+        conf = detect_conf(page)
+    for line in page.split(conf.LINE_SEP):
         if 'Parent Directory' in line or 'Last modified' in line:
             continue
-        search = DIR_REGEX.search(line)
+        search = conf.DIR_REGEX.search(line)
         if search:
             line = search.group(1)
             tourl = url + '/' + line
@@ -54,15 +98,15 @@ def parse_url(namespace, depth, url):
                 if not namespace.no_messages:
                     print(':: max depth reached; ignore ' + tourl) 
             elif 'http://' not in line:
-                parse_url(namespace, depth+1, tourl)
+                parse_url(namespace, depth+1, tourl, conf)
             continue
-        search = A_REGEX.search(line)
+        search = conf.A_REGEX.search(line)
         if search:
             parsed = [ x.strip() for x in line.split('>') ]
             tourl = search.group(1)
             href = url + '/' + tourl
             (date, size) = (x.strip() for x in parsed[-1].rsplit(' ', 1))
-            if check_entry(date, size, href):
+            if check_entry(date, size, href, conf):
                 print(date + '|' + size + '|' + href)    
 
 def size_string(v):
@@ -71,7 +115,7 @@ def size_string(v):
     except:
         raise ArgumentTypeError("String '%s' does not match required format" % (v,))
 
-def check_entry(date, size, href):
+def check_entry(date, size, href, conf):
     if namespace.accept is not None:
         ok = any([href.endswith('.'+x) for x in namespace.accept.split(',')])
         if not ok:
@@ -103,14 +147,14 @@ def check_entry(date, size, href):
             print(':: min depth not reached; ignore ' + href, file=sys.stderr) 
         return 0
     if namespace.before is not None:
-        bdate = datetime.datetime.strptime(date, '%d-%b-%Y %H:%M')
+        bdate = datetime.datetime.strptime(date, conf.DATE_FMT)
         mdate = datetime.datetime.strptime(namespace.before, '%Y-%m-%d %H:%M')
         if bdate > mdate:
             if not namespace.no_messages:
                 print(':: date [%s] after [%s]; ignore %s' % (bdate, mdate, href), file=sys.stderr) 
             return 0
     if namespace.after is not None:
-        bdate = datetime.datetime.strptime(date, '%d-%b-%Y %H:%M')
+        bdate = datetime.datetime.strptime(date, conf.DATE_FMT)
         mdate = datetime.datetime.strptime(namespace.after, '%Y-%m-%d %H:%M')
         if bdate < mdate:
             if not namespace.no_messages:
@@ -122,10 +166,13 @@ def parse_file(namespace, file):
     if not namespace.no_messages:
         print(':: read ' + file, file=sys.stderr)
     with open(file, 'r') as fd:
+        content = fd.read()
+    conf = detect_conf(content)
+    with open(file, 'r') as fd:
         for line in fd:
             line = line[:-1]
             (date, size, href) = line.split('|', 3)
-            if check_entry(date, size, href):
+            if check_entry(date, size, href, conf):
                 print(date + '|' + size + '|' + href)    
 
 
