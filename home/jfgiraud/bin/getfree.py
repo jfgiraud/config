@@ -30,6 +30,7 @@ def read_url(no_messages, urlopener, url, encoding='latin1'):
     except Exception as e:
         raise Exception('Error while trying to read url %s' % url)
 
+
 def csize(s):
     if s[-1]=='k':
         return int(float(s[:-1])*1024)
@@ -43,43 +44,81 @@ class Conf:
     def __init__(self, dir_regex, a_regex, date_fmt, line_sep):
         self.DIR_REGEX = re.compile(dir_regex, re.IGNORECASE)
         self.A_REGEX = re.compile(a_regex, re.IGNORECASE)
-        self.DATE_FMT = date_fmt
         self.LINE_SEP = line_sep
+        self.DATE_FMT = date_fmt
+        self.DATE_REGEXP = re.compile(a2regexp(date_fmt), re.IGNORECASE)
+
+    def a_regexp(self):
+        return self.A_REGEX
+
+    def dir_regexp(self):
+        return self.DIR_REGEX
+
+    def date_regexp(self):
+        return self.DATE_REGEXP
+
+    def date_strptime(self):
+        if self.DATE_FMT:
+            return a2strptime(self.DATE_FMT)
+        else:
+            return None
 
 
-def xxx(s,n,l=2):
+def range_padded(s,n,l=2):
     return '(' + '|'.join([str(x).zfill(l) for x in range(s,n+1)]) + ')'
 
-def y(f):
-    f = f.replace('DD', xxx(1,31))
-    f = f.replace('D', xxx(1,31,1))
+def a2regexp(f):
+    f = f.replace('DD', range_padded(1,31))
+    f = f.replace('D', range_padded(1,31,1))
     f = f.replace('MMM', '\w+')
-    f = f.replace('MM', xxx(1,12))
-    f = f.replace('M', xxx(1,12,1))
+    f = f.replace('MM', range_padded(1,12))
+    f = f.replace('M', range_padded(1,12,1))
     f = f.replace('YYYY', '([12][0-9]{3})')
-    f = f.replace('HH', xxx(0,23))
-    f = f.replace('H', xxx(0,23,1))
-    f = f.replace('hh', xxx(1,12))
-    f = f.replace('h', xxx(1,12,1))
+    f = f.replace('HH', range_padded(0,23))
+    f = f.replace('H', range_padded(0,23,1))
+    f = f.replace('hh', range_padded(1,12))
+    f = f.replace('h', range_padded(1,12,1))
     f = f.replace('A', '(AM|PM)')
     f = f.replace('a', '(am|pm)')
-    f = f.replace('mm', xxx(0,59))
-    f = f.replace('m', xxx(0,59,1))
+    f = f.replace('mm', range_padded(0,59))
+    f = f.replace('m', range_padded(0,59,1))
     f = f.replace(' ', '\s+')
-    return '.*' + f + '.*'
+    return '.*(' + f + ').*'
+
+def a2strptime(f):
+    h = {
+        'DD': '%d',
+        'D': '%d',
+        'MMM': '%b',
+        'MM': '%m',
+        'M': '%m',
+        'YYYY': '%Y',
+        'HH': '%H',
+        'H': '%H',
+        'hh': '%I',
+        'h': '%I',
+        'A': '%p',
+        'a': '%p',
+        'mm': '%M',
+        'm': '%M'
+    }
+    keys = [ (len(x), x) for x in h ]
+    keys.sort()
+    keys.reverse()
+    return re.sub('|'.join([b for a,b in keys]), lambda matchobj: h[matchobj.group(0)], f)
 
 def detect_conf(page):
     page = page.replace('\n', '')
-    date_fmt = next((fmt for fmt in [ y('DD-MMM-YYYY HH:mm'), y('M/D/YYYY h:mm A') ] if re.match(fmt, page, re.IGNORECASE)), None)
-    #print(",,,,",date_fmt)
-    #print(re.match(date_fmt, page.replace('\n',''), re.IGNORECASE))
+    date_fmt = next((fmt for fmt in [ 'DD-MMM-YYYY HH:mm', 'M/D/YYYY h:mm A' ] if re.match(a2regexp(fmt), page, re.IGNORECASE)), None)
     line_sep = '<br>' if re.match('.*</a><br>.*', page, re.IGNORECASE) else '\n'
-    #line_sep = '\n'
-    print(',,,,',line_sep)
     return Conf('<a href="([^"]*/)">[^<]*</a>', 
                 '<a href="([^"]*[^\/])">[^<]*</a>', 
                 date_fmt, 
                 line_sep)
+
+CLEAN_LINE = [ re.compile('\s*<img[^>]+>\s*', re.IGNORECASE),
+               re.compile('\s*<a[^>]+>[^<]*</a>\s*', re.IGNORECASE)
+]
     
 def parse_url(namespace, depth, url, conf=None):
     page = read_url(namespace.no_messages, None, url)
@@ -90,7 +129,7 @@ def parse_url(namespace, depth, url, conf=None):
     for line in page.split(conf.LINE_SEP):
         if 'Parent Directory' in line or 'Last modified' in line:
             continue
-        search = conf.DIR_REGEX.search(line)
+        search = conf.dir_regexp().search(line)
         if search:
             line = search.group(1)
             tourl = url + '/' + line
@@ -100,12 +139,17 @@ def parse_url(namespace, depth, url, conf=None):
             elif 'http://' not in line:
                 parse_url(namespace, depth+1, tourl, conf)
             continue
-        search = conf.A_REGEX.search(line)
-        if search:
-            parsed = [ x.strip() for x in line.split('>') ]
+        search = conf.a_regexp().search(line)
+        date = conf.date_regexp().search(line)
+        if date:
+            date = date.group(1)
+        if search and date:
             tourl = search.group(1)
             href = url + '/' + tourl
-            (date, size) = (x.strip() for x in parsed[-1].rsplit(' ', 1))
+            for regex in CLEAN_LINE:
+                line = regex.sub('', line)
+            line = line.replace(date, '')
+            size = line.strip()
             if check_entry(date, size, href, conf):
                 print(date + '|' + size + '|' + href)    
 
@@ -147,14 +191,14 @@ def check_entry(date, size, href, conf):
             print(':: min depth not reached; ignore ' + href, file=sys.stderr) 
         return 0
     if namespace.before is not None:
-        bdate = datetime.datetime.strptime(date, conf.DATE_FMT)
+        bdate = datetime.datetime.strptime(date, conf.date_strptime())
         mdate = datetime.datetime.strptime(namespace.before, '%Y-%m-%d %H:%M')
         if bdate > mdate:
             if not namespace.no_messages:
                 print(':: date [%s] after [%s]; ignore %s' % (bdate, mdate, href), file=sys.stderr) 
             return 0
     if namespace.after is not None:
-        bdate = datetime.datetime.strptime(date, conf.DATE_FMT)
+        bdate = datetime.datetime.strptime(date, conf.date_strptime())
         mdate = datetime.datetime.strptime(namespace.after, '%Y-%m-%d %H:%M')
         if bdate < mdate:
             if not namespace.no_messages:
