@@ -31,13 +31,25 @@ def read_url(no_messages, urlopener, url, encoding='latin1'):
         raise Exception('Error while trying to read url %s' % url)
 
 
-def csize(s):
+def size_str_2_int(s):
     if s[-1]=='k':
         return int(float(s[:-1])*1024)
     elif s[-1]=='M':
         return int(float(s[:-1])*1024*1024)
     else:
         return int(s)
+
+def humanize_size(s):
+    if re.match('^\d+$', s):
+        s=int(s)
+        if s>=1024:
+            s=s//1024
+            x='k'
+        if s>=1024:
+            s=s//1024
+            x='M'
+        return '%d%s' % (s, x)
+    return s
 
 class Conf:
     
@@ -119,6 +131,21 @@ def detect_conf(page):
 CLEAN_LINE = [ re.compile('\s*<img[^>]+>\s*', re.IGNORECASE),
                re.compile('\s*<a[^>]+>[^<]*</a>\s*', re.IGNORECASE)
 ]
+
+def fix_url(url, current_url=None):
+    if current_url:
+        url = urllib.parse.urljoin(current_url, url)
+    try:
+        parsed = urllib.parse.urlparse(url)
+        qs = urllib.parse.parse_qs(parsed.query)
+        for k, v in qs.items():
+            if type(v) == type([]) and len(v) == 1:
+                qs[k] = v[0].encode("latin-1")
+        parsed_aslist = list(parsed)
+        parsed_aslist[4] = urllib.parse.urlencode(qs)
+        return urllib.parse.urlunparse(parsed_aslist)
+    except:
+        return url
     
 def parse_url(namespace, depth, url, conf=None):
     page = read_url(namespace.no_messages, None, url)
@@ -145,12 +172,16 @@ def parse_url(namespace, depth, url, conf=None):
             date = date.group(1)
         if search and date:
             tourl = search.group(1)
-            href = url + '/' + tourl
+            #href = url + '/' + tourl
+            href = fix_url(tourl, url)
             for regex in CLEAN_LINE:
                 line = regex.sub('', line)
             line = line.replace(date, '')
             size = line.strip()
             if check_entry(date, size, href, conf):
+                date = datetime.datetime.strptime(date, conf.date_strptime())
+                date = date.strftime('%Y-%m-%d %H:%M')
+                size = humanize_size(size)
                 print(date + '|' + size + '|' + href)    
 
 def size_string(v):
@@ -173,15 +204,15 @@ def check_entry(date, size, href, conf):
                 print(':: extension not accepted; ignore ' + href, file=sys.stderr) 
             return 0
     if namespace.min_size is not None:
-        bsize = csize(size)
-        msize = csize(namespace.min_size)
+        bsize = size_str_2_int(size)
+        msize = size_str_2_int(namespace.min_size)
         if bsize < msize:
             if not namespace.no_messages:
                 print(':: file too small [%s]; ignore %s' % (size, href), file=sys.stderr) 
             return 0
     if namespace.max_size is not None:
-        bsize = csize(size)
-        msize = csize(namespace.max_size)
+        bsize = size_str_2_int(size)
+        msize = size_str_2_int(namespace.max_size)
         if bsize > msize:
             if not namespace.no_messages:
                 print(':: file too large [%s]; ignore %s' % (size, href), file=sys.stderr) 
