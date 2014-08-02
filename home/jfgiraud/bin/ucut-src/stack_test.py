@@ -140,6 +140,7 @@ if __name__ == '__main__':
     assertStackOp([False], None, ['LOREM IPSUM', 'ABC'], 'contains')
     assertStackOp([True], None, ['LOREM IPSUM', ' IPS'], 'contains')
     assertStackOp(['L*REM IPSUM'], None, ['LOREM IPSUM', 'O', '*'], 'replace')
+    assertStackOp(['LREM IPSUM'], None, ['LOREM IPSUM', 'O'], 'rmstr')
     assertStackOp(['lorem ipsum'], None, ['\t lorem ipsum  '], 'strip')
     assertStackOp(['lorem ipsum  '], None, ['\t lorem ipsum  '], 'lstrip')
     assertStackOp(['\t lorem ipsum'], None, ['\t lorem ipsum  '], 'rstrip')

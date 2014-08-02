@@ -215,7 +215,7 @@ class Reader:
                     self.s.append(int(token))
                 elif re.match('^(-)?((\\d*\.)?\\d+?([eE][+-]?\\d+)?|nan|inf)$', token):
                     self.s.append(float(token))
-                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn", "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot", "keep", "pop", "push", "remove", "swap", "value", "insert", "empty", "clear", "unpick", "get", "upper", "lower", "capitalize", "title", "deaccent", "slugify", "length", "startswith", "endswith", "contains", "reverse", "replace", "concat", "strip", "lstrip", "rstrip", "split", "rsplit", "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=', 'eval', 'sto', 'and', 'or', 'not', 'xor', '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
+                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn", "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot", "keep", "pop", "push", "remove", "swap", "value", "insert", "empty", "clear", "unpick", "get", "upper", "lower", "capitalize", "title", "deaccent", "slugify", "length", "startswith", "endswith", "contains", "reverse", "replace", "rmstr", "concat", "strip", "lstrip", "rstrip", "split", "rsplit", "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=', 'eval', 'sto', 'and', 'or', 'not', 'xor', '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
                     
                     associations = {
                         '+': '_add',
@@ -806,6 +806,12 @@ class Stack:
         text = self.pop()
         #print(by, what, text)
         self.push(text.replace(what, by))
+    def rmstr(self):
+        self.__assert_string([1, 2], 'rmstr')
+        what = self.pop()
+        text = self.pop()
+        #print(by, what, text)
+        self.push(text.replace(what, ''))
     def strip(self):
         self.__assert_string([1], 'strip')
         self.push(self.pop().strip())

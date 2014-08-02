@@ -68,6 +68,7 @@ if __name__ == '__main__':
     assertTokenize(['"\\"', '"*"', 'replace' ], '"\\\\" "*" replace')    
 
     if 1:
+        assertStackOp([3], [3], '')
         assertStackOp([3, 1], [3], '1')
         assertStackOp([3, 7], [3], '7')
         assertStackOp([3, Prog([2, 5])], [3], '{ 2 5 }')
