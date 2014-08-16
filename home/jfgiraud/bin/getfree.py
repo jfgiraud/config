@@ -121,7 +121,11 @@ def a2strptime(f):
 
 def detect_conf(page):
     page = page.replace('\n', '')
-    date_fmt = next((fmt for fmt in [ 'DD-MMM-YYYY HH:mm', 'M/D/YYYY h:mm A' ] if re.match(a2regexp(fmt), page, re.IGNORECASE)), None)
+    formats = [ 'DD-MMM-YYYY HH:mm', 'M/D/YYYY h:mm A', 'YYYY-MM-DD HH:mm' ]
+    date_fmt = next((fmt for fmt in formats if re.match(a2regexp(fmt), page, re.IGNORECASE)), None)
+    if date_fmt is None:
+        print('Date format not detected.', file=sys.stderr)
+        sys.exit(1)
     line_sep = '<br>' if re.match('.*</a><br>.*', page, re.IGNORECASE) else '\n'
     return Conf('<a href="([^"]*/)">[^<]*</a>', 
                 '<a href="([^"]*[^\/])">[^<]*</a>', 
