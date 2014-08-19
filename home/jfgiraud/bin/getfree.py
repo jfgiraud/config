@@ -18,14 +18,14 @@ signal(SIGPIPE,SIG_DFL)
 # RAF 
 # fmt
 
-def print_err(no_messages, text):
-    if not no_messages:
+def print_err(silent, text):
+    if not silent:
         print(text, file=sys.stderr)
 
 
-def read_url(no_messages, urlopener, url, encoding='latin1'):
+def read_url(silent, urlopener, url, encoding='latin1'):
     url = url.replace('&amp;', '&')
-    print_err(namespace.no_messages, ':: read ' + url)
+    print_err(namespace.silent, ':: read ' + url)
     try:
         if urlopener is None:
             response = urllib.request.urlopen(url)
@@ -158,7 +158,7 @@ def fix_url(url, current_url=None):
         return url
     
 def parse_url(namespace, depth, url, conf=None, count=1):
-    page = read_url(namespace.no_messages, None, url)
+    page = read_url(namespace.silent, None, url)
     if not 'Parent Directory' in page:
         return
     if conf is None:
@@ -171,7 +171,7 @@ def parse_url(namespace, depth, url, conf=None, count=1):
             line = search.group(1)
             tourl = url + '/' + line
             if namespace.max_depth is not None and (depth + 1 > namespace.max_depth):
-                print_err(namespace.no_messages, ':: max depth reached; ignore ' + tourl) 
+                print_err(namespace.silent, ':: max depth reached; ignore ' + tourl) 
             elif 'http://' not in line:
                 count = parse_url(namespace, depth+1, tourl, conf, count)
             continue
@@ -194,7 +194,7 @@ def parse_url(namespace, depth, url, conf=None, count=1):
                     size = humanize_size(size)
                     execute(date, size, href, count)
                 else:
-                    print_err(namespace.no_messages, ":: not in range (#" + str(count) + "); ignore " + tourl)
+                    print_err(namespace.silent, ":: not in range (#" + str(count) + "); ignore " + tourl)
                 count = count + 1
     return count
 
@@ -222,41 +222,49 @@ def check_entry(date, size, href, conf):
     if namespace.accept is not None:
         ok = any([href.endswith('.'+x) for x in namespace.accept.split(',')])
         if not ok:
-            print_err(namespace.no_messages, ':: extension not accepted; ignore ' + href) 
+            print_err(namespace.silent, ':: extension not accepted; ignore ' + href) 
             return 0
     if namespace.reject is not None:
         ok = any([href.endswith('.'+x) for x in namespace.reject.split(',')])
         if ok:
-            print_err(namespace.no_messages, ':: extension not accepted; ignore ' + href) 
+            print_err(namespace.silent, ':: extension not accepted; ignore ' + href) 
             return 0
     if namespace.min_size is not None:
         bsize = size_str_2_int(size)
         msize = size_str_2_int(namespace.min_size)
         if bsize < msize:
-            print_err(namespace.no_messages, ':: file too small [%s]; ignore %s' % (size, href)) 
+            print_err(namespace.silent, ':: file too small [%s]; ignore %s' % (size, href)) 
             return 0
     if namespace.max_size is not None:
         bsize = size_str_2_int(size)
         msize = size_str_2_int(namespace.max_size)
         if bsize > msize:
-            print_err(namespace.no_messages, ':: file too large [%s]; ignore %s' % (size, href)) 
+            print_err(namespace.silent, ':: file too large [%s]; ignore %s' % (size, href)) 
             return 0
     if namespace.min_depth is not None and depth < namespace.min_depth:
-        print_err(namespace.no_messages, ':: min depth not reached; ignore ' + href) 
+        print_err(namespace.silent, ':: min depth not reached; ignore ' + href) 
         return 0
     if namespace.before is not None:
         bdate = datetime.datetime.strptime(date, conf.date_strptime())
-        mdate = datetime.datetime.strptime(namespace.before, '%Y-%m-%d %H:%M')
+        mdate = getdatetime(namespace.before)
         if bdate > mdate:
-            print_err(namespace.no_messages, ':: date [%s] after [%s]; ignore %s' % (bdate, mdate, href)) 
+            print_err(namespace.silent, ':: date [%s] after [%s]; ignore %s' % (bdate, mdate, href)) 
             return 0
     if namespace.after is not None:
         bdate = datetime.datetime.strptime(date, conf.date_strptime())
-        mdate = datetime.datetime.strptime(namespace.after, '%Y-%m-%d %H:%M')
+        mdate = getdatetime(namespace.after)
         if bdate < mdate:
-            print_err(namespace.no_messages, ':: date [%s] before [%s]; ignore %s' % (bdate, mdate, href)) 
+            print_err(namespace.silent, ':: date [%s] before [%s]; ignore %s' % (bdate, mdate, href)) 
             return 0
     return 1
+
+def getdatetime(text):
+    o = re.match("(\d+) day(s)? ago", text)
+    if o:
+        return datetime.datetime.now() - datetime.timedelta(int(o.group(1)))
+    else:
+        return datetime.datetime.strptime(text, '%Y-%m-%d %H:%M')
+
 
 def is_between_lines(namespace, c):
     if namespace.lines != None:
@@ -272,7 +280,7 @@ def is_between_lines(namespace, c):
     return True
 
 def parse_file(namespace, file, count=1):
-    print_err(namespace.no_messages, ':: read ' + file)
+    print_err(namespace.silent, ':: read ' + file)
     with open(file, 'r') as fd:
         content = fd.read()
     conf = detect_conf(content)
@@ -284,7 +292,7 @@ def parse_file(namespace, file, count=1):
                 if is_between_lines(namespace, count):
                     execute(date, size, href, count)
                 else:
-                    print_err(namespace.no_messages, ":: not in range (#" + str(count) + "); ignore " + href)
+                    print_err(namespace.silent, ":: not in range (#" + str(count) + "); ignore " + href)
                 count = count + 1
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -306,7 +314,7 @@ for a_parser in [ parser_url, parser_file ]:
     a_parser.add_argument('--max-size', metavar='SIZE', type=size_string, help='Ignore file with size greater than the specified size')
     a_parser.add_argument('--accept', metavar='EXTENSIONS', type=str, help='Accept only the files with the specified extensions')
     a_parser.add_argument('--reject', metavar='EXTENSIONS', type=str, help='Reject the files with the specified extensions')
-    a_parser.add_argument('--no-messages', help='Suppress messages', action='store_true')
+    a_parser.add_argument('--silent', help='Suppress messages', action='store_true')
     a_parser.add_argument('--after', metavar='DATETIME', type=str, help='Reject the files with date/time before the specified datetime (YYYY-MM-DD hh:mm)')
     a_parser.add_argument('--before', metavar='DATETIME', type=str, help='Reject the files with date/time after the specified datetime (YYYY-MM-DD hh:mm)')
     a_parser.add_argument('--lines', metavar='LINES', type=str, help='Select specified lines matching all filters (N, N-, N-M, -M)')
