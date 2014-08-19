@@ -297,7 +297,7 @@ def parse_file(namespace, file, count=1):
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                  add_help=True,
-                                 description='Parent Directory Indexor: scan an homedir and create a file containing urls')
+                                 description='Scan Public Directory tool')
 
 subparsers = parser.add_subparsers(help='Help for subcommand', dest='command')
 
