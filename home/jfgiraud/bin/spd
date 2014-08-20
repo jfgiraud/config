@@ -18,14 +18,14 @@ signal(SIGPIPE,SIG_DFL)
 # RAF 
 # fmt
 
-def print_err(silent, text):
-    if not silent:
+def print_err(verbose, text):
+    if not verbose:
         print(text, file=sys.stderr)
 
 
-def read_url(silent, urlopener, url, encoding='latin1'):
+def read_url(verbose, urlopener, url, encoding='latin1'):
     url = url.replace('&amp;', '&')
-    print_err(namespace.silent, ':: read ' + url)
+    print_err(namespace.verbose, ':: read ' + url)
     try:
         if urlopener is None:
             response = urllib.request.urlopen(url)
@@ -158,7 +158,7 @@ def fix_url(url, current_url=None):
         return url
     
 def parse_url(namespace, depth, url, conf=None, count=1):
-    page = read_url(namespace.silent, None, url)
+    page = read_url(namespace.verbose, None, url)
     if not 'Parent Directory' in page:
         return
     if conf is None:
@@ -169,9 +169,9 @@ def parse_url(namespace, depth, url, conf=None, count=1):
         search = conf.dir_regexp().search(line)
         if search:
             line = search.group(1)
-            tourl = url + '/' + line
+            tourl = fix_url(line, url)
             if namespace.max_depth is not None and (depth + 1 > namespace.max_depth):
-                print_err(namespace.silent, ':: max depth reached; ignore ' + tourl) 
+                print_err(namespace.verbose, ':: max depth reached; ignore ' + tourl) 
             elif 'http://' not in line:
                 count = parse_url(namespace, depth+1, tourl, conf, count)
             continue
@@ -194,21 +194,25 @@ def parse_url(namespace, depth, url, conf=None, count=1):
                     size = humanize_size(size)
                     execute(date, size, href, count)
                 else:
-                    print_err(namespace.silent, ":: not in range (#" + str(count) + "); ignore " + tourl)
+                    print_err(namespace.verbose, ":: not in range (#" + str(count) + "); ignore " + tourl)
                 count = count + 1
     return count
 
 def print_separator(text):
     columns = shutil.get_terminal_size().columns
-    print('-- ' + text + ' ' + '-' * (columns - len(text) - 5), file=sys.stdout)
+    print('-- ' + text + ' ' + '-' * (columns - len(text) - 5), file=sys.stderr)
 
 def execute(date, size, href, count):
-    if namespace.print or namespace.exec:
-        banner = '#{index} {date} [{size}] {url}'.format(index=count, size=size, date=date, url=href)
+    if any([namespace.print, namespace.exec, namespace.banner]):
+        if namespace.banner:
+            print_separator('#{index} {date} [{size}] {url}'.format(index=count, size=size, date=date, url=href))
         if namespace.print:
-            print_separator(namespace.print.format(index=count, size=size, date=date, url=href, banner=banner))
+            print(namespace.print.format(index=count, size=size, date=date, url=href, file=sys.stdout))
         if namespace.exec:
-            os.system(namespace.exec.format(index=count, size=size, date=date, url=href, banner=banner))
+            import shlex
+            import subprocess
+            l = [ x.format(index=count, size=size, date=date, url=href) for x in shlex.split(namespace.exec) ]
+            subprocess.call(l)
     else:
         print(date + '|' + size + '|' + href)
 
@@ -222,39 +226,39 @@ def check_entry(date, size, href, conf):
     if namespace.accept is not None:
         ok = any([href.endswith('.'+x) for x in namespace.accept.split(',')])
         if not ok:
-            print_err(namespace.silent, ':: extension not accepted; ignore ' + href) 
+            print_err(namespace.verbose, ':: extension not accepted; ignore ' + href) 
             return 0
     if namespace.reject is not None:
         ok = any([href.endswith('.'+x) for x in namespace.reject.split(',')])
         if ok:
-            print_err(namespace.silent, ':: extension not accepted; ignore ' + href) 
+            print_err(namespace.verbose, ':: extension not accepted; ignore ' + href) 
             return 0
     if namespace.min_size is not None:
         bsize = size_str_2_int(size)
         msize = size_str_2_int(namespace.min_size)
         if bsize < msize:
-            print_err(namespace.silent, ':: file too small [%s]; ignore %s' % (size, href)) 
+            print_err(namespace.verbose, ':: file too small [%s]; ignore %s' % (size, href)) 
             return 0
     if namespace.max_size is not None:
         bsize = size_str_2_int(size)
         msize = size_str_2_int(namespace.max_size)
         if bsize > msize:
-            print_err(namespace.silent, ':: file too large [%s]; ignore %s' % (size, href)) 
+            print_err(namespace.verbose, ':: file too large [%s]; ignore %s' % (size, href)) 
             return 0
     if namespace.min_depth is not None and depth < namespace.min_depth:
-        print_err(namespace.silent, ':: min depth not reached; ignore ' + href) 
+        print_err(namespace.verbose, ':: min depth not reached; ignore ' + href) 
         return 0
     if namespace.before is not None:
         bdate = datetime.datetime.strptime(date, conf.date_strptime())
         mdate = getdatetime(namespace.before)
         if bdate > mdate:
-            print_err(namespace.silent, ':: date [%s] after [%s]; ignore %s' % (bdate, mdate, href)) 
+            print_err(namespace.verbose, ':: date [%s] after [%s]; ignore %s' % (bdate, mdate, href)) 
             return 0
     if namespace.after is not None:
         bdate = datetime.datetime.strptime(date, conf.date_strptime())
         mdate = getdatetime(namespace.after)
         if bdate < mdate:
-            print_err(namespace.silent, ':: date [%s] before [%s]; ignore %s' % (bdate, mdate, href)) 
+            print_err(namespace.verbose, ':: date [%s] before [%s]; ignore %s' % (bdate, mdate, href)) 
             return 0
     return 1
 
@@ -280,7 +284,7 @@ def is_between_lines(namespace, c):
     return True
 
 def parse_file(namespace, file, count=1):
-    print_err(namespace.silent, ':: read ' + file)
+    print_err(namespace.verbose, ':: read ' + file)
     with open(file, 'r') as fd:
         content = fd.read()
     conf = detect_conf(content)
@@ -292,7 +296,7 @@ def parse_file(namespace, file, count=1):
                 if is_between_lines(namespace, count):
                     execute(date, size, href, count)
                 else:
-                    print_err(namespace.silent, ":: not in range (#" + str(count) + "); ignore " + href)
+                    print_err(namespace.verbose, ":: not in range (#" + str(count) + "); ignore " + href)
                 count = count + 1
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -314,12 +318,14 @@ for a_parser in [ parser_url, parser_file ]:
     a_parser.add_argument('--max-size', metavar='SIZE', type=size_string, help='Ignore file with size greater than the specified size')
     a_parser.add_argument('--accept', metavar='EXTENSIONS', type=str, help='Accept only the files with the specified extensions')
     a_parser.add_argument('--reject', metavar='EXTENSIONS', type=str, help='Reject the files with the specified extensions')
-    a_parser.add_argument('--silent', help='Suppress messages', action='store_true')
+    a_parser.add_argument('--verbose', help='Display more messages', action='store_false')
     a_parser.add_argument('--after', metavar='DATETIME', type=str, help='Reject the files with date/time before the specified datetime (YYYY-MM-DD hh:mm)')
     a_parser.add_argument('--before', metavar='DATETIME', type=str, help='Reject the files with date/time after the specified datetime (YYYY-MM-DD hh:mm)')
     a_parser.add_argument('--lines', metavar='LINES', type=str, help='Select specified lines matching all filters (N, N-, N-M, -M)')
-    a_parser.add_argument('--print', metavar='FORMAT', type=str, help='Print the given string replacing patterns {index} {date} {size} {url} {banner} by their respective values")')
+    a_parser.add_argument('--banner', help='Display banner ', action='store_true')
+    a_parser.add_argument('--print', metavar='FORMAT', type=str, help='Print the given string replacing patterns {index} {date} {size} {url} by their respective values")')
     a_parser.add_argument('--exec', metavar='COMMAND', type=str, help='Execute the given shell command (ex: echo "#{index} {date} // {size} // {url}")')
+
 
 if len(sys.argv)==1: 
     parser.print_help()
@@ -330,8 +336,13 @@ if len(sys.argv)==1:
 namespace = parser.parse_args()
 try:
     if namespace.command == 'url':
-        parse_url(namespace, 0, namespace.url[0])
+        url = namespace.url[0]
+        if url and not url.endswith('/'):
+            url = url + '/' 
+        parse_url(namespace, 0, url)
     else:
         parse_file(namespace, namespace.file[0])
 except KeyboardInterrupt:
     print('Interrupted.', file=sys.stderr)
+
+
