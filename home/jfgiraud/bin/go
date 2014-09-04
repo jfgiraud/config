@@ -11,31 +11,27 @@ displaybar() {
     fi
 }
 
-function call_mysql () {
-    local host="$1"
-    local port="$2"
-    local login="$3"
-    local password="$4"
-    local dbname="$5"
-    shift 5
-    displaybar 
-    echo $"Command: mysql -h $host -P $port -u $login -p\"$password\" $dbname"
-    displaybar 
-    mysql -h $host -P $port -u $login -p"$password" $dbname "$@"
-}
-
 function select_choice() {
-    local file="$1"
-    local choice="$2"
-    shift 2
-    local fname=go_${choice// /_}
+    local prefix="$1"
+    local file="$2"
+    local choice="$3"
+    shift 3
+    if [[ ${prefix: -1} != '_' ]]; then
+	prefix=${prefix}_
+    fi
+    local fname=${prefix}${choice// /_}
     $fname "$@"
     return $?
 }
 
+function trim () {
+    read -rd '' $1 <<<"${!1}"
+}
+
 function search_function() {
-    local file="$1"
-    shift
+    local prefix="$1"
+    local file="$2"
+    shift 2
     local patterns=()
     while [[ $# -gt 0 && "$1" != "--" ]]; do
         patterns+=("$1")
@@ -47,8 +43,9 @@ function search_function() {
     local choices=()
     while IFS=$'\n' read line || [[ $line ]]; 
     do
-        local words=${line#declare -f go_}
+        local words=${line#declare -f $prefix}
         words=${words//_/ }
+	trim words
 	local matches=1
 	for pattern in "${patterns[@]}"; do
             if [ "${pattern:0:1}" == "+" ]; then
@@ -73,15 +70,15 @@ function search_function() {
 	if [ $matches -eq 1 ]; then
 	    choices+=("$words")
 	fi
-    done < <( typeset -F | grep 'declare -f go_' | sort )
+    done < <( typeset -F | grep "declare -f $prefix" | sort )
     if [ ${#choices[@]} -eq 1 ]; then
-	select_choice "$file" "${choices[0]}" "$@"
+	select_choice "$prefix" "$file" "${choices[0]}" "$@"
 	return $?
     fi
     select choice in "${choices[@]}";
     do
         if [ -n "$choice" ]; then
-	    select_choice "$file" "$choice" "$@"
+	    select_choice "$prefix" "$file" "$choice" "$@"
             return $?
         fi
 	break
@@ -95,8 +92,12 @@ function main() {
         file=$2
         shift 2
     fi
+    #prefix="go_$1"
+    #shift
+    prefix=go_
+    source "$(readlink -f "${file/gorc/gof}")"
     source "$(readlink -f "$file")"
-    search_function "$file" "$@"
+    search_function "$prefix" "$file" "$@"
 }
 
 main "$@"
