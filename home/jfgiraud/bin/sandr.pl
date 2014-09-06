@@ -7,11 +7,12 @@ use Getopt::Long;
 use utf8;
 use Unicode::Normalize;
 
-binmode(STDOUT, ":utf8");
-binmode(STDERR, ":utf8");
+#binmode(STDOUT, ":utf8");
+#binmode(STDERR, ":utf8");
 
 Getopt::Long::Configure(qw{no_auto_abbrev no_ignore_case_always});
 
+my $tmp_name = ".bak";
 my $use_regexp;
 my $search=undef;
 my $replace=undef;
@@ -23,9 +24,11 @@ my $map_file=undef;
 my $debug=0;
 my $help=0;
 my $ignorecase=0;
-my $algorithm = 'default';
-my $algorithms = { 'none' => undef,
-		   'default' => \&compute_case
+my $algorithm = undef;
+my $algorithms = { 'id' => \&compute_id,
+		   'keep' => \&compute_case,
+		   'default_direct' => undef, 
+		   'default_extract' => \&compute_case
 };
 
 GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
@@ -35,7 +38,7 @@ GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
 	    'simulate|t' => \$simulate,
 	    'confirm|c' => \$confirm,
 	    'extract-map|e' => \$extract_map,
-	    'compute-case-method|m=s' => sub { $algorithm=$_[1] },
+	    'compute-case-method|m=s' => \$algorithm,
 	    'apply-map|a=s' => sub { $apply_map=1; $map_file=$_[1] },
 	    'help|h' => \$help,
 	    'debug|d' => \$debug
@@ -68,6 +71,9 @@ SYNOPSYS:
                                   output. entries of this map will be setted with a default
                                   value
  *********************************************
+fdout non gere
+ *********************************************
+
              -i, --ignore-case    search ingoring case
              -a, --apply-map      use a map to perform replacement
              -t, --simulate       perform a simulation for replacements
@@ -105,7 +111,7 @@ error(1,"setting option --confirm makes no sense with option --extract-map") if 
 error(1,"--extract-map and --apply-map option are mutually exclusives") if ($extract_map && $apply_map);
 error(1,"setting option --extract-map implies to set options --search and --replace") if ($extract_map && ((not defined $search) || (not defined $replace)));
 error(1,"--search and --replace are required when --apply-map is not used") if ((not $apply_map) && ((not defined $search) || (not defined $replace)));
-error(1,"unknown algorithm '$algorithm' for option --init-algorithm") if (not exists ($algorithms->{$algorithm}));
+error(1,"unknown algorithm '$algorithm' for option --compute-case-method") if ((defined $algorithm) && not exists ($algorithms->{$algorithm}));
 
 if (0) {
     sub assert($$$$) {
@@ -149,10 +155,20 @@ if (@ARGV == 0) {
 if (not $apply_map) {
     if ($use_regexp) {
 	$replace = '"' . $replace . '"';
+
     } else {
 	$search = quotemeta($search);
     }
+    if (not defined $algorithm) {
+	if ($ignorecase) {
+	    $algorithm = 'keep';
+	} else {
+	    $algorithm = 'id';
+	}
+    }
+    #print "<$algorithm>\n";
 }
+
 
 sub deaccent($) {
     my ($s) = @_;
@@ -232,10 +248,15 @@ sub compute_case($$$) {
     return $repl;
 }
 
+sub compute_id($$$) {
+    my ($match, $search, $repl) = @_;
+    return $repl;
+}
+
 my $extracted = {};
 sub extract($) {
     my ($fdin) = @_;
-    my $function = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default"}; 
+    my $function = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default_extract"}; 
     while (defined (my $line = <$fdin>)) {
 	my @table;
 	if ($ignorecase) {
@@ -296,8 +317,20 @@ sub apply_map($$) {
 
 sub algo($$$) {
     my ($match, $search, $replace) = @_;
-    my $function = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default"}; 
+    my $function = exists($algorithms->{$algorithm}) ? $algorithms->{$algorithm} : $algorithms->{"default_direct"}; 
     return (defined $function ? &$function($match,$search,$replace) : $replace);
+}
+
+sub unquote($) {
+   my ($s) = @_;
+   $s =~ s/^"//;
+   $s =~ s/"$//;
+   return $s;
+}
+
+sub algox($$$) {
+    my ($match, $search, $replace) = @_;
+    return algo($match,$search,unquote($replace));
 }
 
 sub apply_repl($$) {
@@ -305,9 +338,9 @@ sub apply_repl($$) {
     while (defined (my $line = <$fdin>)) {
         if ($use_regexp) {
             if ($ignorecase) {
-                $line =~ s/$search/$replace/giee;
+                $line =~ s/($search)/algox($1,$search,$replace)/geei;
 	    } else {
-	        $line =~ s/$search/$replace/gee;
+	        $line =~ s/($search)/algox($1,$search,$replace)/gee;
 	    }
         } else {
             if ($ignorecase) {
@@ -322,15 +355,22 @@ sub apply_repl($$) {
 
 foreach my $file (@ARGV) {
     my $fdin;
-    my $fdout = \*STDOUT;
+    my $fdout;
     if (-d $file) {
 	next;
     }
     if ($file eq '-') {
 	$fdin = \*STDIN;
+        $fdout = \*STDOUT;
     } else {
 	open(FILE,"$file") || die("Unable to open file '$file' ($!)\n") ;
 	$fdin = \*FILE;
+        if ($simulate == 0) {
+            open(TMPFILE,">$file.$tmp_name") || die("Impossible de créer le fichier temporaire '$file.$tmp_name' ($!)\n") ;
+            $fdout = \*TMPFILE;
+        } else {
+            $fdout = \*STDOUT;
+        }
     }
     if ($extract_map) {
 	extract($fdin);
@@ -343,6 +383,14 @@ foreach my $file (@ARGV) {
     }
     if (fileno($fdin) != fileno(STDIN)) {
 	close($fdin);
+    }
+    if (fileno($fdout) != fileno(STDOUT)) {
+        my @file_info = stat($file) ;
+        close($fdout) ;
+        unlink($file) || die("Impossible de supprimer le fichier '$file' ($!)\n") ;
+        rename("$file.$tmp_name",$file) || die("Impossible de supprimer le fichier temporaire '$file.$tmp_name' ($!)\n") ;
+	chmod($file_info[2],$file) || die("Impossible de restaurer les permissions du fichier '$file' ($!)\n");
+	chown($file_info[4],$file_info[5],$file) || die("Impossible de restaurer le propriétaire du fichier '$file'\n");
     }
 }
 
