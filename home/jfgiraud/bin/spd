@@ -105,7 +105,10 @@ def a2regexp(f):
     f = f.replace('mm', range_padded(0,59))
     f = f.replace('m', range_padded(0,59,1))
     f = f.replace(' ', '\s+')
-    return '.*(' + f + ').*'
+    f = f.replace(',', '\s*,\s*')
+    
+    #return '.*(' + f + ').*'
+    return f
 
 def a2strptime(f):
     h = {
@@ -135,12 +138,12 @@ def a2strptime(f):
 def detect_conf(page):
     page = page.replace('\n', '')
     formats = [ 'DD-MMM-YYYY HH:mm', 'M/D/YYYY h:mm A', 'YYYY-MM-DD HH:mm', 'dddd, MMMM DD, YYYY h:mm A' ]
-    date_fmt = next((fmt for fmt in formats if re.match(a2regexp(fmt), page, re.IGNORECASE)), None)
+    date_fmt = next((fmt for fmt in formats if re.search(a2regexp(fmt), page, re.IGNORECASE)), None)
     if date_fmt is None:
         print('Date format not detected.', file=sys.stderr)
         sys.exit(1)
     line_sep = '<br>' if re.match('.*</a><br>.*', page, re.IGNORECASE) else '\n'
-    print(a2regexp(date_fmt))
+    #print(date_fmt, a2regexp(date_fmt))
     return Conf('<a href="([^"]*/)">[^<]*</a>', 
                 '<a href="([^"]*[^\/])">[^<]*</a>', 
                 date_fmt, 
@@ -185,8 +188,15 @@ def parse_url(namespace, depth, url, conf=None, count=1):
             continue
         search = conf.a_regexp().search(line)
         date = conf.date_regexp().search(line)
+
+        #print('line=',line, file=sys.stderr)
+        #print('size=',size, file=sys.stderr)
+
         if date:
-            date = date.group(1)
+            date = date.group(0)
+
+        #print('date=',date, file=sys.stderr)
+
         if search and date:
             tourl = search.group(1)
             #href = url + '/' + tourl
@@ -195,6 +205,8 @@ def parse_url(namespace, depth, url, conf=None, count=1):
                 line = regex.sub('', line)
             line = line.replace(date, '')
             size = line.strip()
+
+
             if check_entry(date, size, href, conf):
                 if is_between_lines(namespace, count):
                     date = datetime.datetime.strptime(date, conf.date_strptime())
@@ -303,6 +315,7 @@ def parse_file(namespace, file, count=1):
         for line in fd:
             line = line[:-1]
             (date, size, href) = line.split('|', 3)
+            
             if check_entry(date, size, href, conf):
                 if is_between_lines(namespace, count):
                     execute(date, size, href, count)
