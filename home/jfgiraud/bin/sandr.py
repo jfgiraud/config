@@ -61,10 +61,10 @@ def compute_case(m,s,r, flag_useregexp):
         return r
     if s == m.swapcase():
         return r.swapcase()
-    for f in [ 'lower', 'upper', 'title', 'capitalize' ]:
+    for f in [ 'lower', 'upper', 'capitalize', 'title' ]:
         if m == getattr(m, f)():
             return getattr(r, f)()
-    return "*TODO*" + r
+    return r
 
 algorithms = { 'id': lambda m,s,r: r,
                'default_extract': compute_case
@@ -112,7 +112,7 @@ if flag_extractmap and applymap:
 if flag_extractmap and (search is None or replace is None):
     error("setting option --extract-map implies to set options --search and --replace") 
 
-if (applymap is not None) and (search is None or replace is None):
+if (applymap is None) and (search is None or replace is None):
     error("--search and --replace are required when --apply-map is not used")
 
 if (algorithm is not None) and algorithm not in algorithms:
@@ -157,4 +157,9 @@ if flag_extractmap:
                 match = match[0]
             replace = re.sub(search, replace, match, flags=reflags)
             print(match, '=>', method(match, search, replace, flag_useregexp))
-
+elif applymap is not None:
+    with open(applymap, 'rt') as fd:
+        config = dict([(k.strip(),v.strip()) for (k,v) in [line.split(' => ', 2) for line in fd]])
+    print(config)
+else:
+    raise Exception('à implémenter')
