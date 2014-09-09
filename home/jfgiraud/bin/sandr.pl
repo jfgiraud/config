@@ -17,7 +17,7 @@ my $use_regexp;
 my $search=undef;
 my $replace=undef;
 my $simulate=0;
-my $confirm=0;
+my $color=0;
 my $extract_map=0;
 my $apply_map=0;
 my $map_file=undef;
@@ -36,7 +36,7 @@ GetOptions ('search|s=s' => sub { $use_regexp=0; $search=$_[1] },
 	    'replace|r=s' => \$replace,
 	    'ignore-case|i' => \$ignorecase,
 	    'simulate|t' => \$simulate,
-	    'confirm|c' => \$confirm,
+	    'color|c' => \$color,
 	    'extract-map|e' => \$extract_map,
 	    'compute-case-method|m=s' => \$algorithm,
 	    'apply-map|a=s' => sub { $apply_map=1; $map_file=$_[1] },
@@ -78,7 +78,7 @@ fdout non gere
              -a, --apply-map      use a map to perform replacement
              -t, --simulate       perform a simulation for replacements
                                   the results will be displayed on standart output
-             -c, --confirm        prompt before applaying replacements on files
+             -c, --color        prompt before applaying replacements on files
                                   
         
 With no FILE, or when FILE is -, read standard input.
@@ -107,7 +107,7 @@ if ($debug) {
 }
 
 error(1,"setting option --simulate makes no sense with option --extract-map") if ($extract_map && $simulate);
-error(1,"setting option --confirm makes no sense with option --extract-map") if ($extract_map && $confirm);
+#error(1,"setting option --color makes no sense with option --simulate") if ($color && not $simulate);
 error(1,"--extract-map and --apply-map option are mutually exclusives") if ($extract_map && $apply_map);
 error(1,"setting option --extract-map implies to set options --search and --replace") if ($extract_map && ((not defined $search) || (not defined $replace)));
 error(1,"--search and --replace are required when --apply-map is not used") if ((not $apply_map) && ((not defined $search) || (not defined $replace)));
@@ -310,8 +310,17 @@ sub apply_map($$) {
     my $repl = parse_file_to_map("$map_file");
     my $regexp = "(" . join("|", reverse(sort(keys(%$repl)))) . ")";
     while (defined (my $line = <$fdin>)) {
-	$line =~ s/$regexp/$repl->{$1}/g;
-	printf $fdout $line;
+	my $ori = $line;
+        $line =~ s/$regexp/$repl->{$1}/g;
+        if (fileno($fdout) == fileno(STDOUT)) {
+            if ($color && ($line ne $ori)) {
+		print $fdout "\033[0;31m$line\033[0;39m";
+	    } else {
+		print $fdout $line;
+	    }
+        } else {
+            printf $fdout $line;
+        }
     }
 }
 
@@ -336,6 +345,7 @@ sub algox($$$) {
 sub apply_repl($$) {
     my ($fdin, $fdout) = @_;
     while (defined (my $line = <$fdin>)) {
+        my $ori = $line;
         if ($use_regexp) {
             if ($ignorecase) {
                 $line =~ s/($search)/algox($1,$search,$replace)/geei;
@@ -349,7 +359,15 @@ sub apply_repl($$) {
                 $line =~ s/($search)/algo($1,$search,$replace)/ge;
 	    }
         }
-	printf $fdout $line;
+        if (fileno($fdout) == fileno(STDOUT)) {
+            if ($color && ($line ne $ori)) {
+		print $fdout "\033[0;31m$line\033[0;39m";
+	    } else {
+		print $fdout $line;
+	    }
+        } else {
+            printf $fdout $line;
+        }
     }
 }
 
@@ -384,13 +402,15 @@ foreach my $file (@ARGV) {
     if (fileno($fdin) != fileno(STDIN)) {
 	close($fdin);
     }
+    
+
     if (fileno($fdout) != fileno(STDOUT)) {
         my @file_info = stat($file) ;
         close($fdout) ;
-        unlink($file) || die("Impossible de supprimer le fichier '$file' ($!)\n") ;
-        rename("$file.$tmp_name",$file) || die("Impossible de supprimer le fichier temporaire '$file.$tmp_name' ($!)\n") ;
-	chmod($file_info[2],$file) || die("Impossible de restaurer les permissions du fichier '$file' ($!)\n");
-	chown($file_info[4],$file_info[5],$file) || die("Impossible de restaurer le propriétaire du fichier '$file'\n");
+        unlink($file) || die("Unable to remove file '$file' ($!)\n") ;
+        rename("$file.$tmp_name",$file) || die("Unable to remove file '$file.$tmp_name' ($!)\n") ;
+	chmod($file_info[2],$file) || die("Unable to restore permissions on file '$file' ($!)\n");
+	chown($file_info[4],$file_info[5],$file) || die("Unable to restore file owner for '$file'\n");
     }
 }
 
