@@ -188,25 +188,15 @@ def parse_url(namespace, depth, url, conf=None, count=1):
             continue
         search = conf.a_regexp().search(line)
         date = conf.date_regexp().search(line)
-
-        #print('line=',line, file=sys.stderr)
-        #print('size=',size, file=sys.stderr)
-
         if date:
             date = date.group(0)
-
-        #print('date=',date, file=sys.stderr)
-
         if search and date:
             tourl = search.group(1)
-            #href = url + '/' + tourl
             href = fix_url(tourl, url)
             for regex in CLEAN_LINE:
                 line = regex.sub('', line)
             line = line.replace(date, '')
             size = line.strip()
-
-
             if check_entry(date, size, href, conf):
                 if is_between_lines(namespace, count):
                     date = datetime.datetime.strptime(date, conf.date_strptime())
@@ -315,13 +305,26 @@ def parse_file(namespace, file, count=1):
         for line in fd:
             line = line[:-1]
             (date, size, href) = line.split('|', 3)
-            
             if check_entry(date, size, href, conf):
                 if is_between_lines(namespace, count):
                     execute(date, size, href, count)
                 else:
                     print_err(namespace.verbose, ":: not in range (#" + str(count) + "); ignore " + href)
                 count = count + 1
+
+def check_date_detection(expected, line):
+    conf = detect_conf(line)
+    assert conf != None
+    date = conf.date_regexp().search(line)
+    assert date != None
+    assert date.group(0) == expected
+    
+
+if False:
+    check_date_detection('Monday, September 01, 2014  1:02 AM', '<br>   Monday, September 01, 2014  1:02 AM    123456 <A HREF="/somepath/somefile.txt">somefile</A>')
+    check_date_detection('9/3/2014 11:09 AM', '<br>  9/3/2014 11:09 AM    123456 <A HREF="/somepath/somefile.txt">somefile</A>')
+    sys.exit(0)
+
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                  add_help=True,
