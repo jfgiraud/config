@@ -78,7 +78,9 @@ fdout non gere
              -a, --apply-map      use a map to perform replacement
              -t, --simulate       perform a simulation for replacements
                                   the results will be displayed on standart output
-             -c, --color        prompt before applaying replacements on files
+             -c, --color          perform a simulation for replacements
+                                  the results will be displayed on standart output
+                                  colorize modified lines 
                                   
         
 With no FILE, or when FILE is -, read standard input.
@@ -106,8 +108,9 @@ if ($debug) {
     print STDERR "simulate: $simulate\n";
 }
 
+$simulate=1 if $color;
+
 error(1,"setting option --simulate makes no sense with option --extract-map") if ($extract_map && $simulate);
-#error(1,"setting option --color makes no sense with option --simulate") if ($color && not $simulate);
 error(1,"--extract-map and --apply-map option are mutually exclusives") if ($extract_map && $apply_map);
 error(1,"setting option --extract-map implies to set options --search and --replace") if ($extract_map && ((not defined $search) || (not defined $replace)));
 error(1,"--search and --replace are required when --apply-map is not used") if ((not $apply_map) && ((not defined $search) || (not defined $replace)));
@@ -361,7 +364,7 @@ sub apply_repl($$) {
         }
         if (fileno($fdout) == fileno(STDOUT)) {
             if ($color && ($line ne $ori)) {
-		print $fdout "\033[0;31m$line\033[0;39m";
+		print $fdout "\e[0;31m$line\e[0;39m";
 	    } else {
 		print $fdout $line;
 	    }
@@ -371,11 +374,30 @@ sub apply_repl($$) {
     }
 }
 
+sub displaybar($) {
+    my ($title) = @_;
+    my $separator;
+    my $ncols = `tput cols`;
+    if (length($title) == 0) {
+	$separator = "-" x $ncols;
+    } else {
+	$separator = "-" x ($ncols - length($title) - 5);
+    }
+    if ($color) {
+	printf STDERR "\e[0;32m-- $title $separator\e[0;39m\n";
+    } else {
+	printf STDERR "-- $title $separator\n";
+    }
+}
+
 foreach my $file (@ARGV) {
     my $fdin;
     my $fdout;
     if (-d $file) {
 	next;
+    }
+    if (@ARGV >= 2 && $simulate == 1) {
+	displaybar($file);
     }
     if ($file eq '-') {
 	$fdin = \*STDIN;
@@ -384,7 +406,7 @@ foreach my $file (@ARGV) {
 	open(FILE,"$file") || die("Unable to open file '$file' ($!)\n") ;
 	$fdin = \*FILE;
         if ($simulate == 0) {
-            open(TMPFILE,">$file.$tmp_name") || die("Impossible de créer le fichier temporaire '$file.$tmp_name' ($!)\n") ;
+            open(TMPFILE,">$file.$tmp_name") || die("Unable to create the temporary file '$file.$tmp_name' ($!)\n") ;
             $fdout = \*TMPFILE;
         } else {
             $fdout = \*STDOUT;
@@ -408,7 +430,7 @@ foreach my $file (@ARGV) {
         my @file_info = stat($file) ;
         close($fdout) ;
         unlink($file) || die("Unable to remove file '$file' ($!)\n") ;
-        rename("$file.$tmp_name",$file) || die("Unable to remove file '$file.$tmp_name' ($!)\n") ;
+        rename("$file.$tmp_name",$file) || die("Unable to remove temporary file '$file.$tmp_name' ($!)\n") ;
 	chmod($file_info[2],$file) || die("Unable to restore permissions on file '$file' ($!)\n");
 	chown($file_info[4],$file_info[5],$file) || die("Unable to restore file owner for '$file'\n");
     }
