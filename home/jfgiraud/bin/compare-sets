@@ -1,0 +1,107 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import getopt
+import sys
+import argparse
+
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     add_help=True,
+                                     description='compare two sets of data',
+                                     epilog='''---\nWritten by Jean-François Giraud.\n\nCopyright © 2012-2014 Jean-François Giraud.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.''')
+    parser.add_argument('-a', '--file-a', metavar='FILE', help='The lines of file A are the elements of set A')
+    parser.add_argument('-b', '--file-b', metavar='FILE', help='The lines of file B are the elements of set B')
+    parser.add_argument('-o', '--operation', choices=['union', '|', 'intersection', '&', 'difference', '-', 'symmetric_difference', '^'], metavar='OPERATION', help='The operation to perform (union[|], intersection[&], difference[-] or symmetric_difference[^]).', required=True)
+    
+    if len(sys.argv)==1:
+        parser.print_help()
+        sys.exit(1)
+
+    namespace = parser.parse_args()
+
+    a = set(line.strip() for line in open(namespace.file_a))
+    b = set(line.strip() for line in open(namespace.file_b))
+
+    if namespace.operation in ('union', '|'):
+        for e in a | b:
+            print(e)
+    elif namespace.operation in ('intersection', '&'):
+        for e in a & b:
+            print(e)
+    elif namespace.operation in ('difference', '-'):
+        for e in a - b:
+            print(e)
+    elif namespace.operation in ('symmetric_difference', '^'):
+        for e in a ^ b:
+            print(e)
+
+
+sys.exit(0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def usage(retval=0):
+    print('''NAME:
+
+        %(prog)s - compare two sets of data 
+
+SYNOPSYS:
+
+        %(prog)s
+             -h, --help           display help
+             -a, --file-a         file a 
+             -b, --file-b         file b
+             -o, --operation      operation to perform (union, intersection, difference, symmetric_difference)
+AUTHOR
+	Written by Jean-François Giraud.
+
+COPYRIGHT
+	Copyright (c) 2014 Jean-François Giraud.  
+	License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+	This is free software: you are free to change and redistribute it.  
+	There is NO WARRANTY, to the extent permitted by law.
+    ''' % {'prog': sys.argv[0]})
+    sys.exit(retval)
+
+
+
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "ha:b:o:", ["help","file-a=","file-b=","operation=","ignore-case","simulate","confirm","extract-map","apply-map=","method="])
+except getopt.GetoptError:
+    usage(2)
+
+def error(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+for o, a in opts:
+    if o in ("-h", "--help"):
+        usage()
+    if o in ("-s", "--search"):
+        search = a
+    if o in ("-r", "--replace"):
+        replace = a
+    if o in ("-S", "--search-regexp"):
+        search = a
+
+if len(args) == 0:
+    usage(1)
+
+
