@@ -5,36 +5,45 @@ import getopt
 import sys
 import argparse
 
+options = [ (('union', '|'), set.union),
+            (('intersection', '&'), set.intersection),
+            (('difference', '-'), set.difference),
+            (('symmetric-difference', '^'), set.symmetric_difference),
+            (('is-subset', '<='), lambda a,b: [str(a<=b).lower()]),
+            (('is-proper-subset', '<'), lambda a,b: [str(a<b and a!=b).lower()]),
+            (('is-superset', '<='), lambda a,b: [str(a>=b).lower()]),
+            (('is-proper-superset', '<'), lambda a,b: [str(a>b and a!=b).lower()])
+]
+
+choices = [ names[0] for names, func in options ]
+choices += [ names[1] for names, func in options ]
+
+#./compare-sets -o '^' <(cat 1.txt | sort -r) <(tac 2.txt | sort)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     add_help=True,
-                                     description='compare two sets of data',
-                                     epilog='''---\nWritten by Jean-François Giraud.\n\nCopyright © 2012-2014 Jean-François Giraud.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.''')
-    parser.add_argument('-a', '--file-a', metavar='FILE', help='The lines of file A are the elements of set A')
-    parser.add_argument('-b', '--file-b', metavar='FILE', help='The lines of file B are the elements of set B')
-    parser.add_argument('-o', '--operation', choices=['union', '|', 'intersection', '&', 'difference', '-', 'symmetric_difference', '^'], metavar='OPERATION', help='The operation to perform (union[|], intersection[&], difference[-] or symmetric_difference[^]).', required=True)
-    
-    if len(sys.argv)==1:
-        parser.print_help()
-        sys.exit(1)
 
-    namespace = parser.parse_args()
+parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 add_help=True,
+                                 description='compare sets of data',
+                                 epilog='''---\nWritten by Jean-François Giraud.\n\nCopyright © 2012-2014 Jean-François Giraud.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.''')
+parser.add_argument('files', nargs=2, help='the files containing the sets to compare')
+parser.add_argument('-o', '--operation', 
+                    choices=choices, metavar='OPERATION', 
+                    help='The operation to perform (union[|], intersection[&], difference[-], symmetric_difference[^], is-subset[<=], is-proper-subset[<], is-superset[>=] or is-proper-superset[>]).', required=True)
 
-    a = set(line.strip() for line in open(namespace.file_a))
-    b = set(line.strip() for line in open(namespace.file_b))
 
-    if namespace.operation in ('union', '|'):
-        for e in a | b:
+if len(sys.argv)==1:
+    parser.print_help()
+    sys.exit(1)
+
+namespace = parser.parse_args()
+
+a = set(line.strip() for line in open(namespace.files[0]))
+b = set(line.strip() for line in open(namespace.files[1]))
+
+for names, func in options:
+    if namespace.operation in names:
+        for e in func(a,b):
             print(e)
-    elif namespace.operation in ('intersection', '&'):
-        for e in a & b:
-            print(e)
-    elif namespace.operation in ('difference', '-'):
-        for e in a - b:
-            print(e)
-    elif namespace.operation in ('symmetric_difference', '^'):
-        for e in a ^ b:
-            print(e)
+        break
 
