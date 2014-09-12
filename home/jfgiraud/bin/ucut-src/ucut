@@ -1,19 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
-
-# [[[cog
-# import cog
-# import io
-# if include == '1':
-#     with io.open('stack.py', 'r', encoding='utf-8') as fd:
-#         for line in fd:
-#             if not line.startswith('#!/usr/bin/python'):
-#                 cog.out(line)
-# else:
-#     cog.outl('from stack import tokenize, Prog, Stack')   
-# ]]]
-from stack import tokenize, Prog, Stack
-# [[[end]]]
 
 import sys
 import textwrap
@@ -192,6 +178,7 @@ def parseFields(t):
             op = op.strip()
             if not op.startswith('{') and not op.endswith('}'):
                 raise Exception('invalid syntax (should be @{ ... })')
+            print(op)
             p = Prog()
             p.read_until(tokenize(op), None)
             op = p
@@ -410,6 +397,8 @@ def cut_fd(fd):
     if fields is not None:
         indexes = parse_fields_range(fields)
         for line in fd:
+            if line.endswith(b'\r\n'):
+                line=line[:-2]
             if line.endswith(b'\n'):
                 line=line[:-1]
             if whitespace or delimiter in line or delimiter == b'\n':
@@ -426,17 +415,7 @@ def cut_fd(fd):
                         else:
                             r = decomposed[k]
                             op = toapply[i]
-                            if isinstance(op, Prog):
-                                r = tolitteral(r)
-                                i = Stack([r])
-                                op.apply(i, executeProg=True, executeFunction=True)
-                                if i.empty():
-                                    r = ''
-                                else:
-                                    r = i.pop()
-                                values.append(tobytes(r))
-                            else:
-                                values.append(r)
+                            values.append(r)
                     elif isinstance(k, list):
                         op = toapply[i]
                         if not op:
@@ -452,32 +431,14 @@ def cut_fd(fd):
                                 r.extend( [ tolitteral(x) for x in slice_field(decomposed, elem) ])
                             else:
                                 raise Exception('Not supported result (parse_fields_range)')
-                        if isinstance(op, Prog):
-                            i=Stack(r)
-                            op.apply(i, executeProg=True, executeFunction=True)
-                            if i.empty():
-                                r = ''
-                            else:
-                                r = i.pop()
-                            values.append(tobytes(r))
-                        else:
-                            values.append(r)
+                        values.append(r)
                     elif isinstance(k, tuple):
                         op = toapply[i]
                         if not op:
                             values.extend( slice_field(decomposed, k) )
                         else:
                             r = [ tolitteral(x) for x in slice_field(decomposed, k) ]
-                            if isinstance(op, Prog):
-                                i=Stack(r)
-                                op.apply(i, executeProg=True, executeFunction=True)
-                                if i.empty():
-                                    r = ''
-                                else:
-                                    r=i.pop()
-                                values.append(tobytes(r))
-                            else:
-                                values.append(r)
+                            values.append(r)
                     else:
                         raise Exception('Not supported result (parse_fields_range)')
                 sys.stdout.write(output_delimiter.join(values))

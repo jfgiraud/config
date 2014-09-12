@@ -70,31 +70,10 @@ for to in 44 45 46; do
     assertEquals "bytes - Accents (30-$to)"
 done
 
-for i in $(seq 1 100); do
-    (cat <<EOF
-"1","01","ozan","OZAN","Ozan","O250","OSN","01190","284","01284","2","26","6","618","469","500","94","660","4.91667","46.3833","2866","51546","+45456","462330","170","205","14126","8823","26916"
-"2","01","cormoranche-sur-saone","CORMORANCHE-SUR-SAONE","Cormoranche-sur-Saône","C65652625","KRMRNXSRSN","01290","123","01123","2","27","6","1058","903","1000","107","985","4.83333","46.2333","2772","51379","+44953","461427","168","211","9070","7767","19911"
-"3","01","plagne-01","PLAGNE","Plagne","P425","PLKN","01130","298","01298","4","03","6","129","83","100","21","620","5.73333","46.1833","3769","51324","+54342","461131","560","922","31104","25594","27923"
-EOF
-) >> given.txt
-done
+echo "a;b;c" | ./ucut -d';' -f 1,1: > result.txt
+echo "a;a;b;c" > expected.txt
+assertEquals "fields - Add column at beginning"
 
-(cat <<EOF
-OSN;OZAN
-KRMRNXSRSN;CORMORANCHE-SUR-SAONE
-PLKN;PLAGNE
-OSN;OZAN
-KRMRNXSRSN;CORMORANCHE-SUR-SAONE
-PLKN;PLAGNE
-OSN;OZAN
-KRMRNXSRSN;CORMORANCHE-SUR-SAONE
-PLKN;PLAGNE
-OSN;OZAN
-EOF
-) > expected.txt
-
-(./ucut -d ',' -s -f $'(4,7)@{ { -> d { d "\\"" "" replace } } q sto q eval swap q eval 2 ->list "{0};{1}" swap format }' given.txt | head -n 10) &> result.txt
-
-assertEquals "pipes"
-
-
+printf "a;b;c\r\n" | ./ucut -d';' -f 1:,1 > result.txt
+echo "a;b;c;a" > expected.txt
+assertEquals "fields - carriage return"
