@@ -8,7 +8,7 @@ if __name__ == '__main__':
         tokens = tokenize(pattern)
         assert expected == tokens, "EXPECTED: %s ACTUAL: %s" % (str(expected), str(tokens))
 
-    def assertStackOp(expected, elements, ops, **kwargs):
+    def assertStackOp(expected, elements, ops, check_gv=True, check_lv=True, ret=None):
         tokens = tokenize(ops)
         if True:
             print('*' * 80)
@@ -43,14 +43,13 @@ if __name__ == '__main__':
             p.read_until(tokens, None)
             if False:
                 print(p.s)
-            p.apply(i, executeFunction=True)
+            p.apply(i, executeFunction=True, executeProg=False)
             assert e == i, "EXPECTED: %s ACTUAL: %s" % (str(e), str(i))
-            if kwargs.get('check_gv', True):
+            if check_gv:
                 assert egv == i.g_variables, "GV"
-            if kwargs.get('check_lv', True):
+            if check_lv:
                 assert elv == i.l_variables, "LV"
         except AssertionError as e:
-            ret = kwargs.get('ret', None)
             if ret is not None:
                 assert ret.args[0] == e.args[0], e.args[0]
             else:
@@ -69,6 +68,7 @@ if __name__ == '__main__':
 
     if 1:
         assertStackOp([3], [3], '')
+        assertStackOp([3,Variable('ident')], [3], "'ident'")
         assertStackOp([3, 1], [3], '1')
         assertStackOp([3, 7], [3], '7')
         assertStackOp([3, Prog([2, 5])], [3], '{ 2 5 }')
@@ -171,6 +171,10 @@ if __name__ == '__main__':
     assertStackOp(["b*c"], ['b"c'], '"\\"" "*" replace')
     assertStackOp(["b*ac"], ['b\\ac'], '"\\\\" "*" replace')
 
+    assertStackOp(([33],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto')
+    assertStackOp(([33,Prog([2, Function('_add', '+')])],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto q')
+    assertStackOp(([33,Variable('q')],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto \'q\'')
+    assertStackOp(([35],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto \'q\' eval')
 
     sys.exit(0)
 

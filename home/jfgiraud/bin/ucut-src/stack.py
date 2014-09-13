@@ -11,8 +11,9 @@ if sys.version_info >= (3, 0, 0):
     unicode = str
 
 class Variable:
-    def __init__(self, name):
+    def __init__(self, name, quoted=False):
         self.name = name
+        self.quoted = quoted
     #def __str__(self):
     #    return "'%s'" % self.name
     def __repr__(self):
@@ -21,19 +22,22 @@ class Variable:
         return other.__class__ == Variable and self.name == other.name
     def __hash__(self):
         return hash(self.name)
-    def apply(self, stack, **kwargs):
-        if len(stack.l_variables) > 0 and self in stack.l_variables[-1]:
-            stack.push(stack.l_variables[-1][self])
-        elif self in stack.g_variables:
-            stack.push(stack.g_variables[self])
-        else: 
+    def apply(self, stack, executeProg=False, executeFunction=False):
+        if not executeFunction and not executeProg:
             stack.push(self)
+        else:
+            if len(stack.l_variables) > 0 and self in stack.l_variables[-1]:
+                stack.push(stack.l_variables[-1][self])
+            elif self in stack.g_variables:
+                stack.push(stack.g_variables[self])
+            else: 
+                stack.push(self)
 
 class Function:
     def __init__(self, name, original):
         self.name = name
         self.original = original
-    def apply(self, stack, **kwargs):
+    def apply(self, stack, executeProg=False, executeFunction=False):
         f=getattr(stack, self.name)
         f()
     def __eq__(self, other):
@@ -247,7 +251,7 @@ class Reader:
                 elif token.startswith('"') and token.endswith('"'):
                     self.s.append(token[1:-1])
                 elif token.startswith("'") and token.endswith("'"):
-                    self.s.append(Variable(token[1:-1]))
+                    self.s.append(Variable(token[1:-1], quoted=True))
                 else:
                     self.s.append(Variable(token))
             if len(tokens) > 0:
@@ -268,11 +272,15 @@ def push_operations(stack, operations, executeProg=False, executeFunction=False)
         if type(e) in [ int, float, bool, str, unicode ]:
             stack.push(e)
         elif isinstance(e, Variable):
-            if not executeFunction:
-                stack.push(e)
-            else:
-                e.apply(stack)
+            e.apply(stack, executeFunction=executeFunction, executeProg=executeProg)
+#            if e.quoted and not executeFunction and not executeProg:
+#                stack.push(e)
+#            elif not executeFunction:
+#                stack.push(e)
+#            else:
+#                e.apply(stack)
         elif isinstance(e, Prog):
+            #e.apply(stack, executeFunction=executeFunction, executeProg=executeProg)
             if not executeProg:
                 stack.push(e)
             else:
@@ -302,14 +310,9 @@ class Prog(Reader):
     def __repr__(self):
         return 'PROG <' + str(self.s) + '>'
 
-    def apply(self, stack, operations=None, **kwargs):
-        
-        executeProg = kwargs.get('executeProg', False)
-        executeFunction = kwargs.get('executeFunction', False)
-
+    def apply(self, stack, operations=None, executeFunction=False, executeProg=False):
         if operations is None:
             operations = self.s
-            
         push_operations(stack, operations, executeProg, executeFunction)
 
 
