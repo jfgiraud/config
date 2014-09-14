@@ -158,7 +158,6 @@ if (@ARGV == 0) {
 if (not $apply_map) {
     if ($use_regexp) {
 	$replace = '"' . $replace . '"';
-
     } else {
 	$search = quotemeta($search);
     }
@@ -347,13 +346,15 @@ sub algox($$$) {
 
 sub apply_repl($$) {
     my ($fdin, $fdout) = @_;
+    my $rreplace = $replace;
+    $rreplace = '"' . $rreplace . '"'; 
     while (defined (my $line = <$fdin>)) {
         my $ori = $line;
         if ($use_regexp) {
             if ($ignorecase) {
-                $line =~ s/($search)/algox($1,$search,$replace)/geei;
+                $line =~ s/($search)/algox($1,$search,$rreplace)/geei;
 	    } else {
-	        $line =~ s/($search)/algox($1,$search,$replace)/gee;
+	        $line =~ s/($search)/algox($1,$search,$rreplace)/gee;
 	    }
         } else {
             if ($ignorecase) {
