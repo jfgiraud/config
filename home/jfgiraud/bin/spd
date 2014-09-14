@@ -47,7 +47,7 @@ def size_str_2_int(s):
 
 def humanize_size(s):
     if re.match('^\d+$', s):
-        s=int(s)
+        (s, x)=(int(s),'')
         if s>=1024:
             s=s//1024
             x='k'
