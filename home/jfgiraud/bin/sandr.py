@@ -71,7 +71,7 @@ algorithms = { 'id': lambda m,s,r: r,
 }
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:iscea:m:", ["help","search=","search-regexp=","replace=","ignore-case","simulate","confirm","extract-map","apply-map=","method="])
+    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:m:", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","method="])
 except getopt.GetoptError:
     usage(2)
 
@@ -149,17 +149,28 @@ if flag_extractmap:
             extracted.update(extract(fdin))
     method = algorithms.get(algorithm, algorithms['default_extract'])
     for match in extracted:
-        if not flag_useregexp:
-            toreplace = re.sub(search, replace, match, flags=reflags)
-            print(match, '=>', method(match, search, toreplace, flag_useregexp))
-        else:
-            #if type(match)==tuple:
-            #    match = match[0]
-            toreplace = re.sub(search, replace, match, flags=reflags)
-            print(match, '=>', method(match, search, toreplace, flag_useregexp))
+        toreplace = re.sub(search, replace, match, flags=reflags)
+        print(match, '=>', method(match, search, toreplace, flag_useregexp))
 elif applymap is not None:
     with open(applymap, 'rt') as fd:
         config = dict([(k.strip(),v.strip()) for (k,v) in [line.split(' => ', 2) for line in fd]])
-    print(config)
+    pattern = '|'.join(sorted(config, reverse=True))
+    repl = lambda matchobj: config[matchobj.group(0)]
+    for file in args:
+        if file == '-':
+            fdin = sys.stdin
+            fdout = sys.stdout
+        else:
+            fdin = open(file, 'rt')
+            if flag_simulate:
+                fdout = sys.stdout
+            else:
+                fdout = open(file + '-', 'wt')
+        with fdin:
+            with fdout:
+                for line in fdin:
+                    line = re.sub(pattern, repl, line)
+                    print(line, file=fdout)
+    ##### fichiers non geres, le renommage de fic- en fic n'est pas fait
 else:
     raise Exception('à implémenter')
