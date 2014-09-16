@@ -1,9 +1,10 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -u
 
 import getopt
 import os
 import re
 import sys
+import io
 
 # python sandr.py -e -S '((\w+)jour)' -r 'helLO\1' -i aaa
 # python sandr.py -e -s BONjour -r helLO -i aaa
@@ -141,36 +142,55 @@ def extract(fdin):
 if len(args) == 0:
     args = [ "-" ]
 
-if flag_extractmap:
+def apply_on_file(file, pattern, repl):
+    if flag_simulate and len(args) > 1:
+        print(':: ' + file, file=sys.stderr)
+    move = False
+    if file == '-':
+        fdin = io.open(sys.stdin.fileno(), 'rt', closefd=False)
+        fdout = io.open(sys.stdout.fileno(), 'wt', closefd=False)
+    else:
+        fdin = io.open(file, 'rt')
+        if flag_simulate:
+            fdout = io.open(sys.stdout.fileno(), 'wt', closefd=False)  
+        else: 
+            fdout = io.open(file + '-', 'wt')
+            move = True
+    with fdin:
+        with fdout:
+            for line in fdin:
+                line = re.sub(pattern, repl, line)
+                fdout.write(line)
+    if move:
+        shutil.move(file + '-', file)
+
+def extract_map(files):
     extracted = set()
     reflags= re.I if flag_ignorecase else 0
     for file in args:
-        with sys.stdin if file == '-' else open(file, 'rt') as fdin:
+        with io.open(sys.stdin.fileno(), 'rt', closefd=False) if file == '-' else io.open(file, 'rt') as fdin:
             extracted.update(extract(fdin))
     method = algorithms.get(algorithm, algorithms['default_extract'])
+    replacements = {}
     for match in extracted:
         toreplace = re.sub(search, replace, match, flags=reflags)
-        print(match, '=>', method(match, search, toreplace, flag_useregexp))
+        replacements[match] = toreplace
+    return replacements
+
+if flag_extractmap:
+    replacements = extract_map(args)
+    for replacement in replacements:
+        print(replacement, '=>', replacements[replacement])
 elif applymap is not None:
-    with open(applymap, 'rt') as fd:
+    with io.open(applymap, 'rt') as fd:
         config = dict([(k.strip(),v.strip()) for (k,v) in [line.split(' => ', 2) for line in fd]])
     pattern = '|'.join(sorted(config, reverse=True))
     repl = lambda matchobj: config[matchobj.group(0)]
     for file in args:
-        if file == '-':
-            fdin = sys.stdin
-            fdout = sys.stdout
-        else:
-            fdin = open(file, 'rt')
-            if flag_simulate:
-                fdout = sys.stdout
-            else:
-                fdout = open(file + '-', 'wt')
-        with fdin:
-            with fdout:
-                for line in fdin:
-                    line = re.sub(pattern, repl, line)
-                    print(line, file=fdout)
-    ##### fichiers non geres, le renommage de fic- en fic n'est pas fait
+        apply_on_file(file, pattern, repl)
 else:
-    raise Exception('à implémenter')
+    config = extract_map(args)
+    pattern = '|'.join(sorted(config, reverse=True))
+    repl = lambda matchobj: config[matchobj.group(0)]
+    for file in args:
+        apply_on_file(file, pattern, repl)
