@@ -5,6 +5,9 @@ import os
 import re
 import sys
 import io
+import tempfile
+import shutil
+import stat
 
 # python sandr.py -e -S '((\w+)jour)' -r 'helLO\1' -i aaa
 # python sandr.py -e -s BONjour -r helLO -i aaa
@@ -52,22 +55,102 @@ replace = None
 flag_useregexp = False
 flag_ignorecase = False
 flag_simulate = False
-###flag_confirm = False
 flag_extractmap = False
 applymap = None
 algorithm = None
 
-def compute_case(m,s,r, flag_useregexp):
-    if s == m:
+def sc(m, r):
+    if m.isupper():
+        return r.upper()
+    elif m.islower():
+        return r.lower()
+    else:
         return r
-    if s == m.swapcase():
-        return r.swapcase()
+
+def compute_case(m,s,r):
     for f in [ 'lower', 'upper', 'capitalize', 'title' ]:
         if m == getattr(m, f)():
             return getattr(r, f)()
+    if len(m) == len(r):
+        return ''.join([ sc(cm,cr) for cm, cr in zip(m,r) ])
+    if len(m) and len(r):
+        if m[0].isupper():
+            return r[0].upper() + r[1:].lower()
+        if m[0].islower():
+            return r[0].lower() + r[1:].lower()
+    if s == m:
+        return r
     return r
 
+if False:
+    def assertEq(expected, match, search, replace):
+        assert expected == compute_case(match, search, replace), compute_case(match, search, replace)
+    assertEq("defgh", "abcde", "abcde", "defgh")
+    assertEq("Defgh", "Abcde", "abcde", "defgh")
+    assertEq("DEFGH", "ABCDE", "abcde", "defgh")
+    assertEq("defGH", "ABCde", "ABCde", "defGH")
+    assertEq("defGH", "ABCde", "ABCde", "defGH")
+    assertEq("Defghi", "ABcde", "abcde", "defGHI")
+
+def error(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+def extract(fd):
+    found = set()
+    if flag_useregexp:
+        reflags= re.I if flag_ignorecase else 0
+        pattern = re.compile(search, reflags)
+        for line in fd:
+            found.update(pattern.findall(line))
+        return found
+    else:
+        length = len(search)
+        text = search.lower() if flag_ignorecase else search
+        for line in fd:
+            line2 = line.lower() if flag_ignorecase else line
+            start = line2.find(text)
+            while start >= 0:
+                end = start + length
+                found.add(line[start:end])
+                start = line2.find(text, end)
+        return found
+
+def apply_on_file(file, pattern, repl):
+    (use_stdout, filename) = file
+    use_stdout = use_stdout or flag_simulate
+    move = False
+    with open(filename, 'rt') as fdin:
+        if use_stdout:
+            fdout = sys.stdout
+        else:
+            (fno, newfile) = tempfile.mkstemp()
+            fdout = open(fno, 'wt')
+            move = True
+        with fdout:
+            for line in fdin:
+                if pattern:
+                    line = re.sub(pattern, repl, line)
+                fdout.write(line)
+    if move:
+        shutil.move(newfile, filename)
+
+def extract_map(files):
+    extracted = set()
+    reflags= re.I if flag_ignorecase else 0
+    for _, file in args:
+        with open(file, 'rt') as fdin:
+            extracted.update(extract(fdin))
+    replacements = {}
+    for match in extracted:
+        toreplace = re.sub(search, replace, match, flags=reflags)
+        if algorithm:
+            toreplace = algorithms[algorithm](match, search, replace)
+        replacements[match] = toreplace
+    return replacements
+
 algorithms = { 'id': lambda m,s,r: r,
+               'detect': compute_case,
                'default_extract': compute_case
 }
 
@@ -90,22 +173,15 @@ for o, a in opts:
         flag_ignorecase = True
     if o in ("-t", "--simulate"):
         flag_simulate = True
-###    if o in ("-c", "--confirm"):
-###        flag_confirm = True
     if o in ("-e", "--extract-map"):
         flag_extractmap = True
     if o in ("-a", "--apply-map"):
         applymap = a
-
-def error(message):
-    print(message, file=sys.stderr)
-    sys.exit(1)
+    if o in ("-m", "--method"):
+        algorithm = a
 
 if flag_extractmap and flag_simulate:
     error("setting option --simulate makes no sense with option --extract-map") 
-
-###if flag_extractmap and flag_confirm:
-###    error("setting option --confirm makes no sense with option --extract-map") 
 
 if flag_extractmap and applymap:
     error("--extract-map and --apply-map option are mutually exclusives") 
@@ -119,78 +195,42 @@ if (applymap is None) and (search is None or replace is None):
 if (algorithm is not None) and algorithm not in algorithms:
     error("unknown algorithm '%s' for option --compute-case-method" % (algorithm)) 
 
-def extract(fdin):
-    found = set()
-    if flag_useregexp:
-        reflags= re.I if flag_ignorecase else 0
-        pattern = re.compile(search, reflags)
+def create_tmp_and_init(fdin):
+    (fno, newfile) = tempfile.mkstemp() 
+    with open(fno, 'wt') as fdout:
         for line in fdin:
-            found.update(pattern.findall(line))
-        return found
+            fdout.write(line)
+    return newfile
+
+def op(filename):
+    if filename == '-':
+        return (True, create_tmp_and_init(sys.stdin))
     else:
-        length = len(search)
-        text = search.lower() if flag_ignorecase else search
-        for line in fdin:
-            line2 = line.lower() if flag_ignorecase else line
-            start = line2.find(text)
-            while start >= 0:
-                end = start + length
-                found.add(line[start:end])
-                start = line2.find(text, end)
-        return found
+        with open(filename, 'rt') as fdin:
+            if stat.S_ISFIFO(os.fstat(fdin.fileno()).st_mode):
+                return (True, create_tmp_and_init(fdin))
+            else:
+                return (False, filename)
 
 if len(args) == 0:
     args = [ "-" ]
 
-def apply_on_file(file, pattern, repl):
-    if flag_simulate and len(args) > 1:
-        print(':: ' + file, file=sys.stderr)
-    move = False
-    if file == '-':
-        fdin = io.open(sys.stdin.fileno(), 'rt', closefd=False)
-        fdout = io.open(sys.stdout.fileno(), 'wt', closefd=False)
-    else:
-        fdin = io.open(file, 'rt')
-        if flag_simulate:
-            fdout = io.open(sys.stdout.fileno(), 'wt', closefd=False)  
-        else: 
-            fdout = io.open(file + '-', 'wt')
-            move = True
-    with fdin:
-        with fdout:
-            for line in fdin:
-                line = re.sub(pattern, repl, line)
-                fdout.write(line)
-    if move:
-        shutil.move(file + '-', file)
+args = [ op(x) for x in args ]
 
-def extract_map(files):
-    extracted = set()
-    reflags= re.I if flag_ignorecase else 0
+def apply_replacements(config):
+    pattern = '|'.join(sorted(config, reverse=True))
+    repl = lambda matchobj: config[matchobj.group(0)]
     for file in args:
-        with io.open(sys.stdin.fileno(), 'rt', closefd=False) if file == '-' else io.open(file, 'rt') as fdin:
-            extracted.update(extract(fdin))
-    method = algorithms.get(algorithm, algorithms['default_extract'])
-    replacements = {}
-    for match in extracted:
-        toreplace = re.sub(search, replace, match, flags=reflags)
-        replacements[match] = toreplace
-    return replacements
+        apply_on_file(file, pattern, repl)
 
 if flag_extractmap:
     replacements = extract_map(args)
     for replacement in replacements:
         print(replacement, '=>', replacements[replacement])
 elif applymap is not None:
-    with io.open(applymap, 'rt') as fd:
+    with open(applymap, 'rt') as fd:
         config = dict([(k.strip(),v.strip()) for (k,v) in [line.split(' => ', 2) for line in fd]])
-    pattern = '|'.join(sorted(config, reverse=True))
-    repl = lambda matchobj: config[matchobj.group(0)]
-    for file in args:
-        apply_on_file(file, pattern, repl)
+    apply_replacements(config)
 else:
     config = extract_map(args)
-    pattern = '|'.join(sorted(config, reverse=True))
-    repl = lambda matchobj: config[matchobj.group(0)]
-    for file in args:
-        apply_on_file(file, pattern, repl)
+    apply_replacements(config)
