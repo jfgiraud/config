@@ -8,6 +8,7 @@ import io
 import tempfile
 import shutil
 import stat
+import difflib
 
 # python sandr.py -e -S '((\w+)jour)' -r 'helLO\1' -i aaa
 # python sandr.py -e -s BONjour -r helLO -i aaa
@@ -56,41 +57,8 @@ flag_useregexp = False
 flag_ignorecase = False
 flag_simulate = False
 flag_extractmap = False
+flag_detect = False
 applymap = None
-algorithm = None
-
-def sc(m, r):
-    if m.isupper():
-        return r.upper()
-    elif m.islower():
-        return r.lower()
-    else:
-        return r
-
-def compute_case(m,s,r):
-    for f in [ 'lower', 'upper', 'capitalize', 'title' ]:
-        if m == getattr(m, f)():
-            return getattr(r, f)()
-    if len(m) == len(r):
-        return ''.join([ sc(cm,cr) for cm, cr in zip(m,r) ])
-    if len(m) and len(r):
-        if m[0].isupper():
-            return r[0].upper() + r[1:].lower()
-        if m[0].islower():
-            return r[0].lower() + r[1:].lower()
-    if s == m:
-        return r
-    return r
-
-if False:
-    def assertEq(expected, match, search, replace):
-        assert expected == compute_case(match, search, replace), compute_case(match, search, replace)
-    assertEq("defgh", "abcde", "abcde", "defgh")
-    assertEq("Defgh", "Abcde", "abcde", "defgh")
-    assertEq("DEFGH", "ABCDE", "abcde", "defgh")
-    assertEq("defGH", "ABCde", "ABCde", "defGH")
-    assertEq("defGH", "ABCde", "ABCde", "defGH")
-    assertEq("Defghi", "ABcde", "abcde", "defGHI")
 
 def error(message):
     print(message, file=sys.stderr)
@@ -135,6 +103,12 @@ def apply_on_file(file, pattern, repl):
     if move:
         shutil.move(newfile, filename)
 
+def compute_case(m, r):
+    for f in [ 'upper', 'lower', 'title', 'capitalize' ]:
+        if m == getattr(m, f)():
+            return getattr(r, f)()
+    return r
+
 def extract_map(files):
     extracted = set()
     reflags= re.I if flag_ignorecase else 0
@@ -143,19 +117,32 @@ def extract_map(files):
             extracted.update(extract(fdin))
     replacements = {}
     for match in extracted:
+        #print(match)
+        if type(match) == tuple:
+            match = match[0]
         toreplace = re.sub(search, replace, match, flags=reflags)
-        if algorithm:
-            toreplace = algorithms[algorithm](match, search, replace)
+        if flag_detect:
+            #print('::', match, toreplace)
+            s = difflib.SequenceMatcher(None, match, toreplace)
+            cased = ''
+            for op, i1, i2, j1, j2 in s.get_opcodes():
+                #print(op, i1, i2, j1, j2)
+                if op == 'equal':
+                    cased = cased + toreplace[j1:j2]
+                elif op == 'replace':
+                    cased = cased + compute_case(match[i1:i2], toreplace[j1:j2])
+                elif op == 'delete':
+                    pass
+                else: # insert
+                    cased = cased + toreplace[j1:j2]
+                # [('replace', 0, 6, 0, 7), ('equal', 6, 13, 7, 14), ('insert', 13, 13, 14, 16)]
+            #print(':>', cased)
+
         replacements[match] = toreplace
     return replacements
 
-algorithms = { 'id': lambda m,s,r: r,
-               'detect': compute_case,
-               'default_extract': compute_case
-}
-
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:m:", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","method="])
+    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:d", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","detect"])
 except getopt.GetoptError:
     usage(2)
 
@@ -177,8 +164,8 @@ for o, a in opts:
         flag_extractmap = True
     if o in ("-a", "--apply-map"):
         applymap = a
-    if o in ("-m", "--method"):
-        algorithm = a
+    if o in ("-d", "--detect"):
+        flag_detect = True
 
 if flag_extractmap and flag_simulate:
     error("setting option --simulate makes no sense with option --extract-map") 
@@ -191,9 +178,6 @@ if flag_extractmap and (search is None or replace is None):
 
 if (applymap is None) and (search is None or replace is None):
     error("--search and --replace are required when --apply-map is not used")
-
-if (algorithm is not None) and algorithm not in algorithms:
-    error("unknown algorithm '%s' for option --compute-case-method" % (algorithm)) 
 
 def create_tmp_and_init(fdin):
     (fno, newfile) = tempfile.mkstemp() 
