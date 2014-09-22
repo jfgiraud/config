@@ -1,5 +1,6 @@
 #!/usr/bin/python3 -u
 
+import difflib
 import getopt
 import os
 import re
@@ -22,21 +23,23 @@ def usage(retval=0):
 SYNOPSYS:
 
         %(prog)s
-             -h, --help           display help
-             -s, --search         the string to search
-             -S, --search-regexp  the pattern to search
-             -r, --replace        the string (or the pattern) used to replace all matches 
-             -e, --extract-map    extract from file or standart input all matches of searched
-                                  string or pattern.
-                                  a map created with found matches is displayed on standart 
-                                  output. entries of this map will be setted with a default
-                                  value
-             -i, --ignore-case    search ingoring case
-             -a, --apply-map      use a map to perform replacement
-             -t, --simulate       perform a simulation for replacements
-                                  the results will be displayed on standart output
-####             -c, --confirm        prompt before applaying replacements on files
-                                  
+             -h, --help                 display help
+             -s, --search               the string to search
+             -S, --search-regexp        the pattern to search
+             -r, --replace              the string (or the pattern) used to replace all matches 
+             -e, --extract-map          extract from file or standart input all matches of searched
+                                        string or pattern.
+                                        a map created with found matches is displayed on standart 
+                                        output. entries of this map will be setted with a default
+                                        value
+             -i, --ignore-case          search ingoring case
+             -a, --apply-map            use a map to perform replacement
+             -t, --simulate             perform a simulation for replacements
+                                        the results will be displayed on standart output
+             -c, --case                 apply transformations to try to keep the same case after 
+                                        replacement (usefull with -i option)
+             -l, --min-matching-length  for case transformations, ignore matching group when the
+                                        size is less than de specified value (default 3)
         
 With no FILE, or when FILE is -, read standard input.
 
@@ -58,6 +61,7 @@ flag_ignorecase = False
 flag_simulate = False
 flag_extractmap = False
 flag_detect = False
+matching_min_length=3
 applymap = None
 
 def error(message):
@@ -103,11 +107,42 @@ def apply_on_file(file, pattern, repl):
     if move:
         shutil.move(newfile, filename)
 
-def compute_case(m, r):
-    for f in [ 'upper', 'lower', 'title', 'capitalize' ]:
-        if m == getattr(m, f)():
-            return getattr(r, f)()
-    return r
+def samecase(x, y, d=3):
+    s, t = x.lower(), y.lower()
+    opts = [x for x in difflib.SequenceMatcher(None, s, t).get_matching_blocks()]
+    #print(opts)
+    i1, j1 = 0, 0
+    res = [ [], [] ]
+    while opts:
+        i2, j2, size = opts.pop(0) 
+        #print(i2, j2, size)
+        if size == 0:
+            if x[i1:] and y[j1:]:
+                res[0].append(x[i1:])
+                res[1].append(y[j1:])
+            break
+        if size < d:
+            continue
+        res[0].append(x[i1:i2])
+        res[1].append(y[j1:j2])
+        res[0].append(x[i2:i2+size])
+        res[1].append(y[j2:j2+size])
+        i1 = i2+size
+        j1 = j2+size
+    #print(res)
+    w = ''
+    for a, b in zip(res[0], res[1]):
+        if a.lower() == b.lower():
+            w += a
+        else:
+            for f in [ 'upper', 'lower', 'title', 'capitalize' ]:
+                if getattr(a, f)() == a:
+                    w += getattr(b, f)()
+                    break
+            else:
+                w += b
+    #print(w)
+    return w
 
 def extract_map(files):
     extracted = set()
@@ -122,27 +157,12 @@ def extract_map(files):
             match = match[0]
         toreplace = re.sub(search, replace, match, flags=reflags)
         if flag_detect:
-            #print('::', match, toreplace)
-            s = difflib.SequenceMatcher(None, match, toreplace)
-            cased = ''
-            for op, i1, i2, j1, j2 in s.get_opcodes():
-                #print(op, i1, i2, j1, j2)
-                if op == 'equal':
-                    cased = cased + toreplace[j1:j2]
-                elif op == 'replace':
-                    cased = cased + compute_case(match[i1:i2], toreplace[j1:j2])
-                elif op == 'delete':
-                    pass
-                else: # insert
-                    cased = cased + toreplace[j1:j2]
-                # [('replace', 0, 6, 0, 7), ('equal', 6, 13, 7, 14), ('insert', 13, 13, 14, 16)]
-            #print(':>', cased)
-
+            toreplace = samecase(match, toreplace, d=matching_min_length)
         replacements[match] = toreplace
     return replacements
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:d", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","detect"])
+    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:cl:", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","case","min-matching-length="])
 except getopt.GetoptError:
     usage(2)
 
@@ -164,8 +184,10 @@ for o, a in opts:
         flag_extractmap = True
     if o in ("-a", "--apply-map"):
         applymap = a
-    if o in ("-d", "--detect"):
+    if o in ("-c", "--case"):
         flag_detect = True
+    if o in ("-l", "--min-matching-length"):
+        matching_min_length = int(a)
 
 if flag_extractmap and flag_simulate:
     error("setting option --simulate makes no sense with option --extract-map") 
