@@ -1,0 +1,94 @@
+#!/usr/bin/python3 -u
+
+import difflib
+import sys
+import getopt
+
+def usage(retval=0):
+    print('''NAME:
+
+        %(prog)s - compare two strings
+
+SYNOPSYS:
+
+        %(prog)s
+             -h, --help                 display help
+             -l, --length               minimal size for matching group
+
+'''% {'prog': sys.argv[0]})
+    sys.exit(retval)
+
+def error(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hl:", ["help","length="])
+except getopt.GetoptError:
+    usage(2)
+
+length=1
+for o, a in opts:
+    if o in ("-h", "--help"):
+        usage()
+    if o in ("-l", "--length"):
+        length = int(a)
+
+colors = {'old-value':'\033[1;31m', 
+          'new-value':'\033[1;32m',
+          'file': '\033[1;35m',
+          'box':'\033[1;34m',
+          'reset':'\033[0;m'}
+            
+def colorize_value(v, colorname):
+    color = colors[colorname]
+    if color:
+        return '%s%s%s' % (colors[colorname], v, colors['reset'])
+    else:
+        return v
+    
+def colorize_diff(old, new, d):
+    res = compute_diff(old, new, d=d)
+    s=''
+    for a, b in zip(res[0], res[1]):
+        a, b = a.rstrip('\n'), b.rstrip('\n')
+        if a != b:
+            s += '%s%s%s%s%s' % (colorize_value('{','box'),colorize_value(a,'old-value'),colorize_value('=>','box'),colorize_value(b,'new-value'),colorize_value('}','box'))
+        else:
+            s += a
+    return s
+
+def compute_diff(x, y, f=None, d=3):
+    if f is not None:
+        s = getattr(x, f)()
+        t = getattr(y, f)()
+    else:
+        s, t = x, y
+    opts = [x for x in difflib.SequenceMatcher(None, s, t).get_matching_blocks()]
+    i1, j1 = 0, 0
+    res = [ [], [] ]
+    while opts:
+        i2, j2, size = opts.pop(0) 
+        #print(i2, j2, size)
+        if size == 0:
+            if x[i1:] or y[j1:]:
+                res[0].append(x[i1:])
+                res[1].append(y[j1:])
+            break
+        if size < d:
+            continue
+        res[0].append(x[i1:i2])
+        res[1].append(y[j1:j2])
+        res[0].append(x[i2:i2+size])
+        res[1].append(y[j2:j2+size])
+        i1 = i2+size
+        j1 = j2+size
+    return res
+
+if len(args) == 0:
+    usage()
+
+old=args[0]
+new=args[1]
+
+print(colorize_diff(old, new, length))
