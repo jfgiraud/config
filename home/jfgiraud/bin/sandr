@@ -91,6 +91,19 @@ def extract(fd):
                 start = line2.find(text, end)
         return found
 
+colors = {'old-value':'\033[1;31m', 
+          'new-value':'\033[1;32m',
+          'box':'\033[1;34m',
+          'reset':'\033[0;m'}
+            
+def colorize(v, colorname):
+    color = colors[colorname]
+    if color:
+        return '%s%s%s' % (colors[colorname], v, colors['reset'])
+    else:
+        return v
+    
+
 def apply_on_file(file, pattern, repl):
     (use_stdout, filename) = file
     use_stdout = use_stdout or flag_simulate
@@ -111,10 +124,13 @@ def apply_on_file(file, pattern, repl):
                         if line != old_line:
                             res = ss(old_line, line, d=matching_min_length)
                             for a, b in zip(res[0], res[1]):
+                                a, b = a.rstrip('\n'), b.rstrip('\n')
                                 if a != b:
-                                    print('\033[0;93m#{\033[0;31m%s\033[0;93m=>\033[0;32m%s\033[0;93m}\033[0;m' % (a,b), end='')
+                                    print('%s%s%s%s%s' % (colorize('{','box'),colorize(a,'old-value'),colorize('=>','box'),colorize(b,'new-value'),colorize('}','box')), end='')
                                 else:
                                     print(a, end='')
+                            else:
+                                print('\n', end='')
                         else:
                             print(line, end='')
                     else:
