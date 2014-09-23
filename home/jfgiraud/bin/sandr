@@ -34,14 +34,15 @@ SYNOPSYS:
                                         output. entries of this map will be setted with a default
                                         value
              -i, --ignore-case          search ingoring case
-             -a, --apply-map            use a map to perform replacement
-             -t, --simulate             perform a simulation for replacements
-                                        the results will be displayed on standart output
-             -d, --diff                 compare files before and after replacements
+             -a, --apply-map            use a file containing the map to perform replacement
              -c, --case                 apply transformations to try to keep the same case after 
                                         replacement (usefull with -i option)
              -l, --min-matching-length  for case transformations, ignore matching group when the
                                         size is less than de specified value (default 3)
+             -t, --simulate             perform a simulation for replacements
+                                        the results will be displayed on standart output
+             -d, --diff                 compare files before and after replacements
+             -R, --rename               apply the replacement on the path of files
         
 With no FILE, or when FILE is -, read standard input.
 
@@ -64,6 +65,7 @@ flag_simulate = False
 flag_extractmap = False
 flag_detect = False
 flag_diff = False
+flag_rename_file = False
 matching_min_length=3
 applymap = None
 
@@ -103,14 +105,25 @@ def colorize(v, colorname):
     else:
         return v
     
+def boxify(old, new):
+    res = ss(old, new, d=matching_min_length)
+    s=''
+    for a, b in zip(res[0], res[1]):
+        a, b = a.rstrip('\n'), b.rstrip('\n')
+        if a != b:
+            s += '%s%s%s%s%s' % (colorize('{','box'),colorize(a,'old-value'),colorize('=>','box'),colorize(b,'new-value'),colorize('}','box'))
+        else:
+            s += a
+    return s
+    
 
 def apply_on_file(file, pattern, repl):
-    (use_stdout, filename) = file
-    use_stdout = use_stdout or flag_simulate
+    (use_stdout_ori, filename) = file
+    use_stdout = use_stdout_ori or flag_simulate
     move = False
     with open(filename, 'rt') as fdin:
         if use_stdout:
-            fdout = sys.stdout
+            fdout = open(sys.stdout.fileno(), 'w', closefd=False)
         else:
             (fno, newfile) = tempfile.mkstemp()
             fdout = open(fno, 'wt')
@@ -122,23 +135,21 @@ def apply_on_file(file, pattern, repl):
                     line = re.sub(pattern, repl, line)
                     if flag_diff:
                         if line != old_line:
-                            res = ss(old_line, line, d=matching_min_length)
-                            for a, b in zip(res[0], res[1]):
-                                a, b = a.rstrip('\n'), b.rstrip('\n')
-                                if a != b:
-                                    print('%s%s%s%s%s' % (colorize('{','box'),colorize(a,'old-value'),colorize('=>','box'),colorize(b,'new-value'),colorize('}','box')), end='')
-                                else:
-                                    print(a, end='')
-                            else:
-                                print('\n', end='')
+                            print(boxify(old_line, line), end='\n')
                         else:
                             print(line, end='')
                     else:
                         fdout.write(line)
                 else:
                     fdout.write(line)
+    if flag_rename_file and pattern:
+        newfilename = re.sub(pattern, repl, filename)
+        if filename != newfilename:
+            move = True
+        print('=====>', boxify(filename, newfilename))
     if move:
-        shutil.move(newfile, filename)
+        pass
+        #shutil.move(newfile, filename)
 
 def ss(x, y, f=None, d=3):
     if f is not None:
@@ -191,6 +202,8 @@ def extract_map(files):
     for _, file in args:
         with open(file, 'rt') as fdin:
             extracted.update(extract(fdin))
+            if flag_rename_file:
+                extracted.update(extract([file]))
     replacements = {}
     for match in extracted:
         #print(match)
@@ -203,7 +216,7 @@ def extract_map(files):
     return replacements
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:cl:d", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","case","min-matching-length=","diff"])
+    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:cl:dR", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","case","min-matching-length=","diff","rename"])
 except getopt.GetoptError:
     usage(2)
 
@@ -230,6 +243,8 @@ for o, a in opts:
         applymap = a
     if o in ("-c", "--case"):
         flag_detect = True
+    if o in ("-R", "--rename"):
+        flag_rename_file = True
     if o in ("-l", "--min-matching-length"):
         matching_min_length = int(a)
 
