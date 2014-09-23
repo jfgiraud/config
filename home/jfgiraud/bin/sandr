@@ -34,15 +34,15 @@ SYNOPSYS:
                                         output. entries of this map will be setted with a default
                                         value
              -i, --ignore-case          search ingoring case
-             -a, --apply-map            use a map to perform replacement
+             -a, --apply-map            use a file containing the map to perform replacement
+             -c, --case                 apply transformations to try to keep the same case after 
+                                        replacement (usefull with -i option)
+             -l, --min-matching-length  for case transformations, ignore matching group when the
+                                        size is less than de specified value (default 3)
              -t, --simulate             perform a simulation for replacements
                                         the results will be displayed on standart output
              -d, --diff                 compare files before and after replacements
-             -c, --case                 apply transformations to try to keep the same case after 
-                                        replacement (usefull with -i option)
              -R, --rename               apply the replacement on the path of files
-             -l, --min-matching-length  for case transformations, ignore matching group when the
-                                        size is less than de specified value (default 3)
         
 With no FILE, or when FILE is -, read standard input.
 
