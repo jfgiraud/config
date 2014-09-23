@@ -10,6 +10,7 @@ import tempfile
 import shutil
 import stat
 import difflib
+import subprocess
 
 # python sandr.py -e -S '((\w+)jour)' -r 'helLO\1' -i aaa
 # python sandr.py -e -s BONjour -r helLO -i aaa
@@ -36,6 +37,7 @@ SYNOPSYS:
              -a, --apply-map            use a map to perform replacement
              -t, --simulate             perform a simulation for replacements
                                         the results will be displayed on standart output
+             -d, --diff                 compare files before and after replacements
              -c, --case                 apply transformations to try to keep the same case after 
                                         replacement (usefull with -i option)
              -l, --min-matching-length  for case transformations, ignore matching group when the
@@ -61,6 +63,7 @@ flag_ignorecase = False
 flag_simulate = False
 flag_extractmap = False
 flag_detect = False
+flag_diff = False
 matching_min_length=3
 applymap = None
 
@@ -88,6 +91,19 @@ def extract(fd):
                 start = line2.find(text, end)
         return found
 
+colors = {'old-value':'\033[1;31m', 
+          'new-value':'\033[1;32m',
+          'box':'\033[1;34m',
+          'reset':'\033[0;m'}
+            
+def colorize(v, colorname):
+    color = colors[colorname]
+    if color:
+        return '%s%s%s' % (colors[colorname], v, colors['reset'])
+    else:
+        return v
+    
+
 def apply_on_file(file, pattern, repl):
     (use_stdout, filename) = file
     use_stdout = use_stdout or flag_simulate
@@ -102,13 +118,34 @@ def apply_on_file(file, pattern, repl):
         with fdout:
             for line in fdin:
                 if pattern:
+                    old_line = line
                     line = re.sub(pattern, repl, line)
-                fdout.write(line)
+                    if flag_diff:
+                        if line != old_line:
+                            res = ss(old_line, line, d=matching_min_length)
+                            for a, b in zip(res[0], res[1]):
+                                a, b = a.rstrip('\n'), b.rstrip('\n')
+                                if a != b:
+                                    print('%s%s%s%s%s' % (colorize('{','box'),colorize(a,'old-value'),colorize('=>','box'),colorize(b,'new-value'),colorize('}','box')), end='')
+                                else:
+                                    print(a, end='')
+                            else:
+                                print('\n', end='')
+                        else:
+                            print(line, end='')
+                    else:
+                        fdout.write(line)
+                else:
+                    fdout.write(line)
     if move:
         shutil.move(newfile, filename)
 
-def samecase(x, y, d=3):
-    s, t = x.lower(), y.lower()
+def ss(x, y, f=None, d=3):
+    if f is not None:
+        s = getattr(x, f)()
+        t = getattr(y, f)()
+    else:
+        s, t = x, y
     opts = [x for x in difflib.SequenceMatcher(None, s, t).get_matching_blocks()]
     #print(opts)
     i1, j1 = 0, 0
@@ -129,6 +166,10 @@ def samecase(x, y, d=3):
         res[1].append(y[j2:j2+size])
         i1 = i2+size
         j1 = j2+size
+    return res
+
+def samecase(x, y, d=3):
+    res = ss(x, y, 'lower', d)
     #print(res)
     w = ''
     for a, b in zip(res[0], res[1]):
@@ -162,7 +203,7 @@ def extract_map(files):
     return replacements
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:cl:", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","case","min-matching-length="])
+    opts, args = getopt.getopt(sys.argv[1:], "hs:S:r:itea:cl:d", ["help","search=","search-regexp=","replace=","ignore-case","simulate","extract-map","apply-map=","case","min-matching-length=","diff"])
 except getopt.GetoptError:
     usage(2)
 
@@ -180,6 +221,9 @@ for o, a in opts:
         flag_ignorecase = True
     if o in ("-t", "--simulate"):
         flag_simulate = True
+    if o in ("-d", "--diff"):
+        flag_simulate = True
+        flag_diff = True
     if o in ("-e", "--extract-map"):
         flag_extractmap = True
     if o in ("-a", "--apply-map"):
