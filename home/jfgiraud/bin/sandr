@@ -110,7 +110,7 @@ def apply_on_file(file, pattern, repl):
     move = False
     with open(filename, 'rt') as fdin:
         if use_stdout:
-            fdout = sys.stdout
+            fdout = open(sys.stdout.fileno(), 'w', closefd=False)
         else:
             (fno, newfile) = tempfile.mkstemp()
             fdout = open(fno, 'wt')
