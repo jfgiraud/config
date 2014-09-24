@@ -101,8 +101,8 @@ function chd() {
 }
 
 function svn-cmp () {
-    if [ ! -x "$HOME/bin/cdiff" ]; then
-	echo "Please install 'cdiff' program in $HOME/bin/ directory (https://github.com/ymattw/cdiff)"
+    if ! which cdiff >/dev/null; then
+	echo "Please install 'cdiff' program (https://github.com/ymattw/cdiff)"
 	return 1
     fi
     local file="$1"
@@ -122,7 +122,7 @@ function svn-cmp () {
 	done
     fi
     if [ -n "$revision" ]; then
-	$HOME/bin/cdiff -s --width=$(( $(tput cols) / 2 )) -r"$revision" "$file"
+	cdiff -s --width=$(( $(tput cols) / 2 )) -r"$revision" "$file"
     fi
 }
 
@@ -221,13 +221,23 @@ function ..() {
     else
 	level=${level:1}
 	local curdir=$(pwd)
+	local first=1
+	local found=0
 	IFS='/' read -ra ADDR <<< "$curdir"
-	for (( i = ${#ADDR[@]}-1; i>0; i-- )); do
+	for (( i = ${#ADDR[@]}-1; i>0; i--, first=0 )); do
+	    if [[ $first -eq 1 && "$curdir" =~ "$level" ]]; then
+		cd ..
+		continue
+	    fi
 	    if [[ "${ADDR[$i]}" =~ "$level" ]]; then
+		found=1
 		break
 	    fi
 	    cd ..
 	done
+	if [[ $found -eq 0 ]]; then
+	    cd $curdir
+	fi
     fi
     OLDPWD=$_OLDPWD
 }
@@ -293,6 +303,7 @@ alias iso2utf='iconv --from-code=ISO-8859-15 --to-code=UTF-8'
 alias hexlify=$"hexdump -e '1/1 \"%.2x\"'"
 alias base64-encode='base64'
 alias base64-decode='base64 --decode'
+
 
 if [[ -e "$HOME/.bashrc_local" ]]; then
     source "$HOME/.bashrc_local"
