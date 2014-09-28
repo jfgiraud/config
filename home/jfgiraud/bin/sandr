@@ -42,7 +42,7 @@ SYNOPSYS:
              -t, --simulate             perform a simulation for replacements
                                         the results will be displayed on standart output
              -d, --diff                 compare files before and after replacements
-             -R, --rename               apply the replacement on the path of files
+             -R, --rename               rename files if path matches searched string or pattern
         
 With no FILE, or when FILE is -, read standard input.
 
@@ -98,20 +98,20 @@ colors = {'old-value':'\033[1;31m',
           'box':'\033[1;34m',
           'reset':'\033[0;m'}
             
-def colorize(v, colorname):
+def colorize_value(v, colorname):
     color = colors[colorname]
     if color:
         return '%s%s%s' % (colors[colorname], v, colors['reset'])
     else:
         return v
     
-def boxify(old, new):
+def colorize(old, new):
     res = ss(old, new, d=matching_min_length)
     s=''
     for a, b in zip(res[0], res[1]):
         a, b = a.rstrip('\n'), b.rstrip('\n')
         if a != b:
-            s += '%s%s%s%s%s' % (colorize('{','box'),colorize(a,'old-value'),colorize('=>','box'),colorize(b,'new-value'),colorize('}','box'))
+            s += '%s%s%s%s%s' % (colorize_value('{','box'),colorize_value(a,'old-value'),colorize_value('=>','box'),colorize_value(b,'new-value'),colorize_value('}','box'))
         else:
             s += a
     return s
@@ -119,13 +119,13 @@ def boxify(old, new):
 
 def apply_on_file(file, pattern, repl):
     (use_stdout_ori, filename) = file
-    use_stdout = use_stdout_ori or flag_simulate
+    use_stdout = use_stdout_ori 
     move = False
     with open(filename, 'rt') as fdin:
-        if use_stdout:
+        if use_stdout or flag_simulate:
             fdout = open(sys.stdout.fileno(), 'w', closefd=False)
         else:
-            (fno, newfile) = tempfile.mkstemp()
+            (fno, temporary_file) = tempfile.mkstemp()
             fdout = open(fno, 'wt')
             move = True
         with fdout:
@@ -135,21 +135,29 @@ def apply_on_file(file, pattern, repl):
                     line = re.sub(pattern, repl, line)
                     if flag_diff:
                         if line != old_line:
-                            print(boxify(old_line, line), end='\n')
+                            print(colorize(old_line, line), end='\n')
                         else:
                             print(line, end='')
                     else:
                         fdout.write(line)
                 else:
                     fdout.write(line)
-    if flag_rename_file and pattern:
-        newfilename = re.sub(pattern, repl, filename)
-        if filename != newfilename:
+    renamed_filename = None
+    if not use_stdout and flag_rename_file and pattern:
+        renamed_filename = re.sub(pattern, repl, filename)
+        if filename != renamed_filename:
             move = True
-        print('=====>', boxify(filename, newfilename))
-    if move:
-        pass
-        #shutil.move(newfile, filename)
+            if flag_diff:
+                print('File %s will be renamed to %s (%s)' % (filename, renamed_filename, colorize(filename, renamed_filename)), file=sys.stderr)
+        else:
+            renamed_filename = None
+    if not flag_simulate and move:
+        shutil.move(temporary_file, filename)
+        if renamed_filename is not None:
+            print('Processed: %s (file renamed to %s)' % (filename, renamed_filename), file=sys.stderr)
+            shutil.move(filename, renamed_filename)
+        else:
+            print('Processed: %s' % (filename,), file=sys.stderr)
 
 def ss(x, y, f=None, d=3):
     if f is not None:
