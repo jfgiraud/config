@@ -7,15 +7,16 @@ import getopt
 def usage(retval=0):
     print('''NAME:
 
-        %(prog)s - compare strings on command lines or in files
+        %(prog)s - compare contents
 
 SYNOPSYS:
 
         %(prog)s
              
-             -f, --file                 the string are in files
-             -h, --help                 display help
+             -s, --string               compare strings
+             -f, --file                 compare file contents
              -l, --length               minimal size for matching group
+             -h, --help                 display help
 
 '''% {'prog': sys.argv[0]})
     sys.exit(retval)
@@ -25,17 +26,20 @@ def error(message):
     sys.exit(1)
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hl:f", ["help","length=","file"])
+    opts, args = getopt.getopt(sys.argv[1:], "hl:fs", ["help","length=","file","string"])
 except getopt.GetoptError:
     usage(2)
 
 length=1
 flag_file=False
+flag_string=False
 for o, a in opts:
     if o in ("-h", "--help"):
         usage()
     if o in ("-f", "--file"):
         flag_file=True
+    if o in ("-s", "--string"):
+        flag_string=True
     if o in ("-l", "--length"):
         length = int(a)
 
@@ -95,10 +99,11 @@ if len(args) == 0:
 
 old=args[0]
 new=args[1]
-
 if flag_file:
     old = open(old, 'rt').read()
     new = open(new, 'rt').read()
-    
+elif not flag_string:
+    print("Option --string or --file must be specified", file=sys.stderr)
+    sys.exit(1)
 
 print(colorize_diff(old, new, length))
