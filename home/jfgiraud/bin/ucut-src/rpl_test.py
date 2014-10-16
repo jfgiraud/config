@@ -176,6 +176,7 @@ if __name__ == '__main__':
     assertStackOp(([33,Variable('q')],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto \'q\'')
     assertStackOp(([36],{Variable('q'): Prog([3, Function('_add', '+')])},[]), ([],{},[]), '33 { 3 + } q sto \'q\' eval')
 
+    assertStackOp([8, 10], [8], '{ -> d { d 2 * } } q sto 5 q', check_gv=False)
 
     sys.exit(0)
 
