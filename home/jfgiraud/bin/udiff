@@ -60,7 +60,7 @@ def colorize_diff(old, new, d):
     res = compute_diff(old, new, d=d)
     s=''
     for a, b in zip(res[0], res[1]):
-        a, b = a.rstrip('\n'), b.rstrip('\n')
+        #a, b = a.rstrip('\n'), b.rstrip('\n')
         if a != b:
             s += '%s%s%s%s%s' % (colorize_value('{','box'),colorize_value(a,'old-value'),colorize_value('=>','box'),colorize_value(b,'new-value'),colorize_value('}','box'))
         else:
@@ -106,4 +106,4 @@ elif not flag_string:
     print("Option --string or --file must be specified", file=sys.stderr)
     sys.exit(1)
 
-print(colorize_diff(old, new, length))
+print(colorize_diff(old, new, length), end='')
