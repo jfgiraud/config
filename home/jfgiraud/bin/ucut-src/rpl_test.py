@@ -73,7 +73,7 @@ if __name__ == '__main__':
         assertStackOp([3, 7], [3], '7')
         assertStackOp([3, Prog([2, 5])], [3], '{ 2 5 }')
         assertStackOp([3, Prog([2, 'abc', 5])], [3], '{ 2 "abc" 5 }')
-        assertStackOp([4], [3], '1 +') 
+        assertStackOp([58], [3], '55 +') 
         assertStackOp([3, 1, 2], [3], '1 2')
         assertStackOp([3, 1, 'hello'], [3], '1 "hello"')
         assertStackOp([3, 1, 'hello'], [3], '1 "hello" eval')
@@ -174,7 +174,9 @@ if __name__ == '__main__':
     assertStackOp(([33],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto')
     assertStackOp(([33,Prog([2, Function('_add', '+')])],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto q')
     assertStackOp(([33,Variable('q')],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto \'q\'')
-    assertStackOp(([35],{Variable('q'): Prog([2, Function('_add', '+')])},[]), ([],{},[]), '33 { 2 + } q sto \'q\' eval')
+    assertStackOp(([36],{Variable('q'): Prog([3, Function('_add', '+')])},[]), ([],{},[]), '33 { 3 + } q sto \'q\' eval')
+
+    assertStackOp([8, 10], [8], '{ -> d { d 2 * } } q sto 5 q', check_gv=False)
 
     sys.exit(0)
 

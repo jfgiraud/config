@@ -22,8 +22,8 @@ class Variable:
         return other.__class__ == Variable and self.name == other.name
     def __hash__(self):
         return hash(self.name)
-    def apply(self, stack, executeProg=False, executeFunction=False):
-        if not executeFunction and not executeProg:
+    def apply(self, stack, executeProg=False, executeFunction=False, executeEval=False):
+        if (not executeFunction and not executeProg) or (self.quoted and not executeEval):
             stack.push(self)
         else:
             if len(stack.l_variables) > 0 and self in stack.l_variables[-1]:
@@ -32,6 +32,11 @@ class Variable:
                 stack.push(stack.g_variables[self])
             else: 
                 stack.push(self)
+            if executeEval:
+                val = stack.value()
+                if isinstance(val, Prog):
+                    stack.drop()
+                    push_operations(stack, val.s, True, True, True)
 
 class Function:
     def __init__(self, name, original):
@@ -265,14 +270,13 @@ class Reader:
                 return None
 
 
-def push_operations(stack, operations, executeProg=False, executeFunction=False):
-    #print("---")
+def push_operations(stack, operations, executeProg=False, executeFunction=False, executeEval=False):
     for e in operations:
-        #print '@@', e, stack, executeProg, executeFunction
         if type(e) in [ int, float, bool, str, unicode ]:
             stack.push(e)
         elif isinstance(e, Variable):
-            e.apply(stack, executeFunction=executeFunction, executeProg=executeProg)
+#            print('@@', operations, executeProg, executeFunction, executeEval)
+            e.apply(stack, executeFunction=executeFunction, executeProg=executeProg, executeEval=executeEval)
 #            if e.quoted and not executeFunction and not executeProg:
 #                stack.push(e)
 #            elif not executeFunction:
@@ -295,11 +299,11 @@ def push_operations(stack, operations, executeProg=False, executeFunction=False)
                     if not stack.empty():
                         r = stack.pop()
                         #print(r, type(r), stack)
-                        push_operations(stack, [ r ], True, True)
+                        push_operations(stack, [ r ], executeProg=True, executeFunction=True, executeEval=True)
                 else:
                     e.apply(stack)
         else:
-            raise Exception('Unsupported type ', e)
+            raise Exception('Unsupported type ', type(e), e)
 
 
 class Prog(Reader):
