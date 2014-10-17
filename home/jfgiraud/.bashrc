@@ -7,11 +7,15 @@ if [[ ! "$PATH" =~ (^|:)"$HOME/bin"(:|$) ]]; then
     export PATH="$PATH:$HOME/bin"
 fi
 
-function sib() {
-    ## sib <substr> search sibling directories 
+if [[ -e "$HOME/.bashrc_local" ]]; then
+    source "$HOME/.bashrc_local"
+fi
+
+function cds() {
+    ## cds <substr> search sibling directories 
     ##   prompt for choice (when two or more directories are found) 
     ##   change to directory after prompt
-    ## sib -- [ first | last | previous | next ]
+    ## cds -- [ first | last | previous | next ]
     local substr=$1
     if [ "X$substr" == "X--" ]; then
 	shift
@@ -71,13 +75,13 @@ function sib() {
     done
 }
 
-alias sibn='sib -- next'
-alias sibp='sib -- previous'
-alias sibf='sib -- first'
-alias sibl='sib -- last'
+alias cdn='cds -- next'
+alias cdp='cds -- previous'
+alias cdf='cds -- first'
+alias cdl='cds -- last'
 
-function chd() {
-    ## chd <substr> search children directories 
+function cdc() {
+    ## cdd <substr> search children directories 
     ##   prompt for choice (when two or more directories are found) 
     ##   change to directory after prompt 
     local substr=$1
@@ -304,8 +308,4 @@ alias hexlify=$"hexdump -e '1/1 \"%.2x\"'"
 alias base64-encode='base64'
 alias base64-decode='base64 --decode'
 
-
-if [[ -e "$HOME/.bashrc_local" ]]; then
-    source "$HOME/.bashrc_local"
-fi
 
