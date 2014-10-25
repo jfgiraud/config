@@ -224,7 +224,19 @@ class Reader:
                     self.s.append(int(token))
                 elif re.match('^(-)?((\\d*\.)?\\d+?([eE][+-]?\\d+)?|nan|inf)$', token):
                     self.s.append(float(token))
-                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn", "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot", "keep", "pop", "push", "remove", "swap", "value", "insert", "empty", "clear", "unpick", "get", "upper", "lower", "capitalize", "title", "deaccent", "slugify", "length", "startswith", "endswith", "contains", "reverse", "replace", "rmstr", "concat", "strip", "lstrip", "rstrip", "split", "rsplit", "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=', 'eval', 'sto', 'and', 'or', 'not', 'xor', '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
+                elif token in [ "depth", "drop", "drop2", "dropn", "dup", "dup2", "dupdup", "dupn",
+                "ndupn", "nip", "over", "pick", "pick3", "roll", "rolld", "rot", "unrot",
+                "keep", "pop", "push", "swap", "value", "insert", "empty", "clear", "unpick", 
+                # arrays
+                "a:get", 
+                # string
+                "upper", "lower", "capitalize", "title", "deaccent", "slugify", "length",
+                "startswith", "endswith", "contains", "reverse", "replace", "rmstr", "concat", "substr",
+                "strip", "lstrip", "rstrip", "split", "rsplit", 'unquote*', 
+                # conditions
+                "ift", "ifte", '+', '-', '*', '/', '+', '==', '!=', '<', '>', '<=', '>=',
+                'eval', 'sto', 'and', 'or', 'not', 'xor',
+                '?num', '->str', '?str', '->num', '->list', 'format', 'odd', 'even' ]:
                     
                     associations = {
                         '+': '_add',
@@ -245,12 +257,15 @@ class Reader:
                         '?str': 'isstr',
                         '->num': 'tonum',
                         '->str': 'tostr',
-                        '->list': 'tolist'
+                        '->list': 'tolist',
+                        'unquote*': 'unquote_all'
                     }
 
                     original = token
 
                     token = associations.get(token, original)
+                    
+                    token = token.replace('a:', 'array_')
 
                     self.s.append(Function(token, original))
                 elif token.startswith('"') and token.endswith('"'):
@@ -742,7 +757,7 @@ class Stack:
             result.insert(0, self.pop())
             i=i-1
         self.push(result)
-    def get(self, i):
+    def array_get(self, i):
         o = self.pop()
         if type(o) != list:
             raise Exception("GET: Bad argument type.")
@@ -795,6 +810,22 @@ class Stack:
         b = self.pop()
         a = self.pop()
         self.push(a+b)
+    def unquote_all(self):
+        self.__assert_string([1], 'unquote*')
+        a = self.pop()
+        if a and len(a) >= 2:
+            if a.startswith("'") and a.endswith("'"):
+                self.push(a[1:-1])
+            elif a.startswith('"') and a.endswith('"'):
+                self.push(a[1:-1])
+            elif a.startswith('<') and a.endswith('>'):
+                self.push(a[1:-1])
+            elif a.startswith('[') and a.endswith(']'):
+                self.push(a[1:-1])
+            elif a.startswith('(') and a.endswith(')'):
+                self.push(a[1:-1])
+        else:
+            self.push(a)
     def reverse(self):
         self.__assert_string([1], 'reverse')
         text = self.pop()
@@ -1057,7 +1088,7 @@ class Stack:
             m=max(i)
             self._assert_enough_elements(m, caller)
             for i in i[:]:
-                assert type(self.value(i)) in types, "%s Error: Bad Argument Type" % caller.upper()
+                assert type(self.value(i)) in types, "%s Error: Bad Argument Type" % caller.upper() 
         else:
             self._assert_enough_elements(i, caller)
             assert type(i) in types, "%s Error: Bad Argument Type" % caller.upper()
