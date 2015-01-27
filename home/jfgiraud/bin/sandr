@@ -75,23 +75,28 @@ def error(message):
 
 def extract(fd):
     found = set()
-    if flag_useregexp:
-        reflags= re.I if flag_ignorecase else 0
-        pattern = re.compile(search, reflags)
-        for line in fd:
-            found.update(pattern.findall(line))
-        return found
-    else:
-        length = len(search)
-        text = search.lower() if flag_ignorecase else search
-        for line in fd:
-            line2 = line.lower() if flag_ignorecase else line
-            start = line2.find(text)
-            while start >= 0:
-                end = start + length
-                found.add(line[start:end])
-                start = line2.find(text, end)
-        return found
+    # if flag_useregexp:
+    #     reflags= re.I if flag_ignorecase else 0
+    #     pattern = re.compile(search, reflags)
+    #     for line in fd:
+    #         found.update(pattern.findall(line))
+    #     return found
+    # else:
+    #     length = len(search)
+    #     text = search.lower() if flag_ignorecase else search
+    #     for line in fd:
+    #         line2 = line.lower() if flag_ignorecase else line
+    #         start = line2.find(text)
+    #         while start >= 0:
+    #             end = start + length
+    #             found.add(line[start:end])
+    #             start = line2.find(text, end)
+    #     return found
+    reflags= re.I if flag_ignorecase else 0
+    pattern = re.compile(search if flag_useregexp else re.escape(search), reflags)
+    for line in fd:
+        found.update(pattern.findall(line))
+    return found
 
 colors = {'old-value':'\033[1;31m', 
           'new-value':'\033[1;32m',
@@ -214,13 +219,18 @@ def extract_map(files):
                 extracted.update(extract([file]))
     replacements = {}
     for match in extracted:
-        #print(match)
         if type(match) == tuple:
             match = match[0]
-        toreplace = re.sub(search, replace, match, flags=reflags)
-        if flag_detect:
-            toreplace = samecase(match, toreplace, d=matching_min_length)
-        replacements[match] = toreplace
+        if flag_useregexp:
+            toreplace = re.sub(search, replace, match, flags=reflags)
+            if flag_detect:
+                toreplace = samecase(match, toreplace, d=matching_min_length)
+            replacements[match] = toreplace
+        else:
+            toreplace = re.sub(re.escape(search), replace, match, flags=reflags)
+            if flag_detect:
+                toreplace = samecase(match, toreplace, d=matching_min_length)
+            replacements[match] = toreplace
     return replacements
 
 try:
@@ -291,7 +301,7 @@ if len(args) == 0:
 args = [ op(x) for x in args ]
 
 def apply_replacements(config):
-    pattern = '|'.join(sorted(config, reverse=True))
+    pattern = '|'.join(map(re.escape, sorted(config, reverse=True)))
     repl = lambda matchobj: config[matchobj.group(0)]
     for file in args:
         apply_on_file(file, pattern, repl)
@@ -299,10 +309,15 @@ def apply_replacements(config):
 if flag_extractmap:
     replacements = extract_map(args)
     for replacement in replacements:
-        print(replacement, '=>', replacements[replacement])
+        print(replacement, replacements[replacement], sep=' => ')
 elif applymap is not None:
+    config = {}
     with open(applymap, 'rt') as fd:
-        config = dict([(k.strip(),v.strip()) for (k,v) in [line.split(' => ', 2) for line in fd]])
+        flag_useregexp = None
+        for line in fd:
+            line = line.strip()
+            (k, v) = line.split(' => ', 2)
+            config[k] = v
     apply_replacements(config)
 else:
     config = extract_map(args)
