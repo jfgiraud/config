@@ -75,27 +75,10 @@ def error(message):
 
 def extract(fd):
     found = set()
-    # if flag_useregexp:
-    #     reflags= re.I if flag_ignorecase else 0
-    #     pattern = re.compile(search, reflags)
-    #     for line in fd:
-    #         found.update(pattern.findall(line))
-    #     return found
-    # else:
-    #     length = len(search)
-    #     text = search.lower() if flag_ignorecase else search
-    #     for line in fd:
-    #         line2 = line.lower() if flag_ignorecase else line
-    #         start = line2.find(text)
-    #         while start >= 0:
-    #             end = start + length
-    #             found.add(line[start:end])
-    #             start = line2.find(text, end)
-    #     return found
     reflags= re.I if flag_ignorecase else 0
     pattern = re.compile(search if flag_useregexp else re.escape(search), reflags)
     for line in fd:
-        found.update(pattern.findall(line))
+        found.update([ m.group(0) for m in pattern.finditer(line) ])
     return found
 
 colors = {'old-value':'\033[1;31m', 
@@ -223,6 +206,7 @@ def extract_map(files):
             match = match[0]
         if flag_useregexp:
             toreplace = re.sub(search, replace, match, flags=reflags)
+            print("==>", search, replace, match, toreplace)
             if flag_detect:
                 toreplace = samecase(match, toreplace, d=matching_min_length)
             replacements[match] = toreplace
