@@ -206,7 +206,6 @@ def extract_map(files):
             match = match[0]
         if flag_useregexp:
             toreplace = re.sub(search, replace, match, flags=reflags)
-            print("==>", search, replace, match, toreplace)
             if flag_detect:
                 toreplace = samecase(match, toreplace, d=matching_min_length)
             replacements[match] = toreplace
