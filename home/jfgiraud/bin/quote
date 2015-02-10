@@ -46,7 +46,7 @@ SYNOPSYS:
         $ echo lorem ipsum dolores est | quote -w -a'<' -b'>' -j# 
         <lorem>#<ipsum>#<dolores>#<est>
 
-        $ echo lorem ipsum dolores est | quote -w
+        $ echo lorem ipsum dolores est | quote -qq -w -j', '
         "lorem", "ipsum", "dolores", "est"
 
         $ echo lorem ipsum dolores est | ./quote -w -p'<' -j# 
