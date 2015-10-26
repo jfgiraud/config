@@ -76,7 +76,7 @@ def read_url(verbose, urlopener, url, encoding='latin1'):
             response = urllib.request.urlopen(url)
         else:
             response = urlopener.open(url)
-        content = response.readall()
+        content = response.read()
         return content.decode(encoding)
     except Exception as e:
         raise Exception('Error while trying to read url %s' % url)
@@ -188,15 +188,17 @@ def fix_url(url, current_url=None):
         return urllib.parse.urlunparse(parsed_aslist)
     except:
         return url
+
+PARENT_DIRECTORY = re.compile('Parent Directory', re.I)
     
 def parse_url(namespace, depth, url, conf=None, count=1):
     page = read_url(namespace.verbose, None, url)
-    if not 'Parent Directory' in page:
+    if not PARENT_DIRECTORY.search(page):
         return
     if conf is None:
         conf = detect_conf(page)
     for line in page.split(conf.LINE_SEP):
-        if 'Parent Directory' in line or 'Last modified' in line:
+        if PARENT_DIRECTORY.search(line) or 'Last modified' in line:
             continue
         search = conf.dir_regexp().search(line)
         if search:
