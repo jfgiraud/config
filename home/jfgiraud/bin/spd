@@ -70,7 +70,7 @@ def print_err(verbose, text):
 
 def read_url(verbose, urlopener, url, encoding='latin1'):
     url = url.replace('&amp;', '&')
-    print_err(namespace.verbose, ':: read ' + url)
+    print_err(verbose, ':: read ' + url)
     try:
         if urlopener is None:
             response = urllib.request.urlopen(url)
@@ -189,11 +189,12 @@ def fix_url(url, current_url=None):
     except:
         return url
 
-PARENT_DIRECTORY = re.compile('Parent Directory', re.I)
+PARENT_DIRECTORY = re.compile('Parent Directory|<a href="\\.\\./">\\.\\./</a>', re.I)
     
 def parse_url(namespace, depth, url, conf=None, count=1):
     page = read_url(namespace.verbose, None, url)
     if not PARENT_DIRECTORY.search(page):
+        print_err(namespace.verbose, 'no parent directory line')
         return
     if conf is None:
         conf = detect_conf(page)
