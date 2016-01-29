@@ -13,6 +13,7 @@ import urllib.parse
 import shutil
 import datetime
 import yaml
+import fnmatch
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL) 
 
@@ -190,7 +191,8 @@ def fix_url(url, current_url=None):
         return url
 
 PARENT_DIRECTORY = re.compile('Parent Directory|<a href="\\.\\./">\\.\\./</a>', re.I)
-    
+LAST_MODIFIED = re.compile('Last modified', re.I)
+
 def parse_url(namespace, depth, url, conf=None, count=1):
     page = read_url(namespace.verbose, None, url)
     if not PARENT_DIRECTORY.search(page):
@@ -199,7 +201,7 @@ def parse_url(namespace, depth, url, conf=None, count=1):
     if conf is None:
         conf = detect_conf(page)
     for line in page.split(conf.LINE_SEP):
-        if PARENT_DIRECTORY.search(line) or 'Last modified' in line:
+        if PARENT_DIRECTORY.search(line) or LAST_MODIFIED.search(line):
             continue
         search = conf.dir_regexp().search(line)
         if search:
@@ -259,16 +261,26 @@ def size_string(v):
     except:
         raise ArgumentTypeError("String '%s' does not match required format" % (v,))
 
+def url_matches(href, str):
+    for x in str.split(','):
+        if any(y in x for y in ('*', '?', '[', ']')):
+            r = fnmatch.fnmatch(href, x)
+        else:
+            r = href.endswith('.' + x)
+        if r:
+            return True
+    return False
+
 def check_entry(date, size, href, conf):
     if namespace.accept is not None:
-        ok = any([href.endswith('.'+x) for x in namespace.accept.split(',')])
+        ok = url_matches(href, namespace.accept)
         if not ok:
-            print_err(namespace.verbose, ':: extension not accepted; ignore ' + href) 
+            print_err(namespace.verbose, ':: extension/pattern not accepted; ignore ' + href) 
             return 0
     if namespace.reject is not None:
-        ok = any([href.endswith('.'+x) for x in namespace.reject.split(',')])
+        ok = url_matches(href, namespace.accept)
         if ok:
-            print_err(namespace.verbose, ':: extension not accepted; ignore ' + href) 
+            print_err(namespace.verbose, ':: extension/pattern not accepted; ignore ' + href) 
             return 0
     if namespace.min_size is not None:
         bsize = size_str_2_int(size)
@@ -367,8 +379,8 @@ for a_parser in [ parser_url, parser_file ]:
     a_parser.add_argument('--min-depth', metavar='LEVELS', type=int, help='Ignore file links at levels less than levels')
     a_parser.add_argument('--min-size', metavar='SIZE', type=size_string, help='Ignore file with size less than the specified size')
     a_parser.add_argument('--max-size', metavar='SIZE', type=size_string, help='Ignore file with size greater than the specified size')
-    a_parser.add_argument('--accept', metavar='EXTENSIONS', type=str, help='Accept only the files with the specified extensions')
-    a_parser.add_argument('--reject', metavar='EXTENSIONS', type=str, help='Reject the files with the specified extensions')
+    a_parser.add_argument('--accept', metavar='LIST', type=str, help='Accept only the files with the specified file name suffixes or patterns (comma separated list). If any of the wildcard characters, *, ?, [ or ], appear in an element of the list, it will be treated as a pattern, rather than a suffix')
+    a_parser.add_argument('--reject', metavar='LIST', type=str, help='Reject the files with the specified file name suffixes or patterns (comma separated list). If any of the wildcard characters, *, ?, [ or ], appear in an element of the list, it will be treated as a pattern, rather than a suffix')
     a_parser.add_argument('--verbose', help='Display more messages', action='store_false')
     a_parser.add_argument('--after', metavar='DATETIME', type=str, help='Reject the files with date/time before the specified datetime (YYYY-MM-DD hh:mm)')
     a_parser.add_argument('--before', metavar='DATETIME', type=str, help='Reject the files with date/time after the specified datetime (YYYY-MM-DD hh:mm)')
